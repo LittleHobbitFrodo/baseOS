@@ -7,7 +7,7 @@ CONFIG_PATH="$PWD/config"
 UTIL_CONFIG_FILE="$PWD/config/util.conf"
 DISK_IMAGE_SIZE=128		#	in MB
 OS_RELEASE_FILE=./os-release.txt
-image="./target/baseOS.hdd"		#	disk image file name
+image="./files/baseOS.hdd"		#	disk image file name
 
 
 
@@ -286,7 +286,7 @@ function make_disk_image() {
 	limine="./bootloader/bin/limine-$(uname)-$(uname -m)"		#	platform dependent binary
 	path_limine="$(pwd)/bootloader"
 
-	if [ ! -e "./target/$kernel_name.bin" ]; then
+	if [ ! -e "$kernel" ]; then
 		error "kernel binary does not exist"
 		return 1
 	fi
@@ -323,7 +323,7 @@ function make_disk_image() {
 	# fi
 
 	if [ ! -e "$image" ]; then
-		cp ./target/.template-img.img "$image"
+		cp ./files/.template-img.img "$image"
 		if [ "$?" != 0 ]; then
 			error "failed to copy template disk image"
 			echo command output:
@@ -360,7 +360,7 @@ function make_disk_image() {
 	fi
 
 	#	copy kernel
-	output="$(mcopy -i "$image@@1M" "./target/$kernel_name.bin" ::/boot)"
+	output="$(mcopy -i "$image@@1M" "$kernel" ::/boot)"
 	if [ "$?" != 0 ]; then
 		error "failed to copy kernel"
 		echo command output:
@@ -441,16 +441,16 @@ function build() {
 	if [ "$?" != 0 ]; then error "failed to compile assembly file(s)"; return 1; fi
 
 	#	link files together
-    rm -rf ./target/*
+    rm -rf ./files/*
 	if [ "$os_lang" == "rust" ]; then
-          	cp ./tmp/kernel/kernel.o "./target/$kernel_name.bin"
+          	cp ./tmp/kernel/kernel.o "$kernel"
        fi
 
 
 
 	#	link files together
 	if [ "$os_lang" != "rust" ]; then
-    	find "./tmp/kernel" -name "*.o" -print0 | xargs -0 $linker -m "elf_$os_arch" -nostdlib -static --no-dynamic-linker -z text -z max-page-size=0x1000 -T "$path/linker.ld" -o "./target/$kernel_name.bin"
+    	find "./tmp/kernel" -name "*.o" -print0 | xargs -0 $linker -m "elf_$os_arch" -nostdlib -static --no-dynamic-linker -z text -z max-page-size=0x1000 -T "$path/linker.ld" -o "$kernel"
 		if [ "$?" != 0 ]; then error "failed to link files"; return 1; fi
 	fi
 	note "kernel compilation succeeded"
@@ -1079,8 +1079,9 @@ fi
 
 output=""
 kernel_name="$(cat ./kernel/name)"
-
+kernel="./files/$kernel_name.bin"
 echo kernel name: $kernel_name
+echo kernel: $kernel
 
 
 if  [ -e "$UTIL_CONFIG_FILE" ]; then
