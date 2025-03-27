@@ -1,0 +1,17 @@
+[package]
+name = "baseOS"
+version = "0.0.1"
+edition = "2024"
+
+
+[[bin]]
+name="baseOS"
+path = "src/prelude.rs"
+
+
+[profile.release]
+opt-level = 3
+panic = "abort"
+
+
+[dependencies]
