@@ -1,0 +1,11 @@
+; ModuleID = 'autocfg_f97a4f9d21726c8d_2.6de4f8d1b793b125-cgu.0'
+source_filename = "autocfg_f97a4f9d21726c8d_2.6de4f8d1b793b125-cgu.0"
+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-unknown-none-elf"
+
+!llvm.module.flags = !{!0, !1}
+!llvm.ident = !{!2}
+
+!0 = !{i32 1, !"Code Model", i32 2}
+!1 = !{i32 2, !"RtLibUseGOT", i32 1}
+!2 = !{!"rustc version 1.87.0-nightly (227690a25 2025-03-16)"}
