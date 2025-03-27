@@ -7,7 +7,8 @@ CONFIG_PATH="$PWD/config"
 UTIL_CONFIG_FILE="$PWD/config/util.conf"
 DISK_IMAGE_SIZE=128		#	in MB
 OS_RELEASE_FILE=./os-release.txt
-image="./bin/baseOS.hdd"		#	disk image file name
+image="./target/baseOS.hdd"		#	disk image file name
+
 
 
 #	functions below are used to print coloured output
@@ -285,7 +286,7 @@ function make_disk_image() {
 	limine="./bootloader/bin/limine-$(uname)-$(uname -m)"		#	platform dependent binary
 	path_limine="$(pwd)/bootloader"
 
-	if [ ! -e "./bin/$kernel_name.bin" ]; then
+	if [ ! -e "./target/$kernel_name.bin" ]; then
 		error "kernel binary does not exist"
 		return 1
 	fi
@@ -322,7 +323,7 @@ function make_disk_image() {
 	# fi
 
 	if [ ! -e "$image" ]; then
-		cp ./bin/.template-img.img "$image"
+		cp ./target/.template-img.img "$image"
 		if [ "$?" != 0 ]; then
 			error "failed to copy template disk image"
 			echo command output:
@@ -359,7 +360,7 @@ function make_disk_image() {
 	fi
 
 	#	copy kernel
-	output="$(mcopy -i "$image@@1M" "./bin/$kernel_name.bin" ::/boot)"
+	output="$(mcopy -i "$image@@1M" "./target/$kernel_name.bin" ::/boot)"
 	if [ "$?" != 0 ]; then
 		error "failed to copy kernel"
 		echo command output:
@@ -440,20 +441,16 @@ function build() {
 	if [ "$?" != 0 ]; then error "failed to compile assembly file(s)"; return 1; fi
 
 	#	link files together
-    if [ -e "./bin" ]; then
-    	rm -rf ./bin/*
-    	if [ "$os_lang" == "rust" ]; then
-           	cp ./tmp/kernel/kernel.o "./bin/$kernel_name.bin"
-        fi
-	else
-		mkdir ./bin/
-	fi
+    rm -rf ./target/*
+	if [ "$os_lang" == "rust" ]; then
+          	cp ./tmp/kernel/kernel.o "./target/$kernel_name.bin"
+       fi
 
 
 
 	#	link files together
 	if [ "$os_lang" != "rust" ]; then
-    	find "./tmp/kernel" -name "*.o" -print0 | xargs -0 $linker -m "elf_$os_arch" -nostdlib -static --no-dynamic-linker -z text -z max-page-size=0x1000 -T "$path/linker.ld" -o "./bin/$kernel_name.bin"
+    	find "./tmp/kernel" -name "*.o" -print0 | xargs -0 $linker -m "elf_$os_arch" -nostdlib -static --no-dynamic-linker -z text -z max-page-size=0x1000 -T "$path/linker.ld" -o "./target/$kernel_name.bin"
 		if [ "$?" != 0 ]; then error "failed to link files"; return 1; fi
 	fi
 	note "kernel compilation succeeded"
@@ -1081,6 +1078,9 @@ if [ "$#" -eq 0 ]; then
 fi
 
 output=""
+kernel_name="$(cat ./kernel/name)"
+
+echo kernel name: $kernel_name
 
 
 if  [ -e "$UTIL_CONFIG_FILE" ]; then
@@ -1111,8 +1111,7 @@ fi
 
 
 
-
-
+echo 
 
 subcmdargs=(${@:2})
 case $1 in
