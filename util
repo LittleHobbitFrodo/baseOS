@@ -283,7 +283,7 @@ function compile_asm() {
 
 function make_disk_image() {
 
-	limine="./bootloader/bin/limine-$(uname)-$(uname -m)"		#	platform dependent binary
+	limine="./bootloader/limine/limine-$(uname)-$(uname -m)"		#	platform dependent binary
 	path_limine="$(pwd)/bootloader"
 
 	if [ ! -e "$kernel" ]; then
