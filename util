@@ -1,31 +1,39 @@
 #!/bin/bash
 
-#	variables below are to be modified when tinkering with project components
+##	this script (hopefuly) provides simple and intuitive way to manage the project
 
+#	NOTE: script executions starts below all the functions (about line 1000)
+
+
+
+#	variables below are to be modified when tinkering with project components
 MAIN_C_FILE=init.c		#	in ./kernel/c/src/
 CONFIG_PATH="$PWD/config"
 UTIL_CONFIG_FILE="$PWD/config/util.conf"
 DISK_IMAGE_SIZE=128		#	in MB
 OS_RELEASE_FILE=./os-release.txt
-image="./files/baseOS.hdd"		#	disk image file name
+image="./files/baseOS.iso"		#	disk image file name
+kernel_name="$(cat ./kernel/name)"
+kernel="./files/$kernel_name.bin"
 
 
 
 #	functions below are used to print coloured output
 
-black() { echo -e '\033[0;30m' $1 '\033[0m'; }
-red() { echo -e '\033[0;31m' $1 '\033[0m'; }
-green() { echo -e '\033[0;32m' $1 '\033[0m'; }
-yellow() { echo -e '\033[1;33m' $1 '\033[0m'; }
-blue() { echo -e '\033[0;34m' $1 '\033[0m'; }
-magenta() { echo -e '\033[0;35m' $1 '\033[0m'; }
-cyan() { echo -e '\033[0;36m' $1 '\033[0m'; }
-white() { echo -e "\033[0m" $1 "\033[0m"; }
+black() { echo -e "\033[0;30m$1\033[0m"; }
+red() { echo -e "\033[0;31m$1\033[0m"; }
+green() { echo -e "\033[0;32m$1\033[0m"; }
+yellow() { echo -e "\033[1;33m$1\033[0m"; }
+blue() { echo -e "\033[0;34m$1\033[0m"; }
+magenta() { echo -e "\033[0;35m$1\033[0m"; }
+cyan() { echo -e "\033[0;36m$1\033[0m"; }
+white() { echo -e "\033[0m$1\033[0m"; }
 
 error() { echo "$(red ERROR): $1"; }
 note() { echo "$(magenta NOTE): $1"; }
 warning() { echo "$(yellow WARNING): $1"; }
 warning_no_endl() { echo -n "$(yellow WARNING): $1"; }
+
 
 
 
@@ -228,13 +236,6 @@ function compile_c() {
 		return 1
 	fi
 
-	#	compile init.asm
-    #if [ "$debug" == 0 ]; then
-    #	$asm_compiler -f elf64 -o "./tmp/kernel/asm_init.o" "$path/init.asm"
-    #else
-    #	$asm_compiler -f elf64 -g dwarf -o "./tmp/kernel/asm_init.o" "$path/init.asm"
-    #fi
-
 }
 
 function compile_rust() {
@@ -257,9 +258,7 @@ function compile_rust() {
 
 
 function compile_asm() {
-	#	compile assembler
-
-
+	#	compile assembly
 
     local asmfiles="$(find "$path" -name "*.asm")"
     for i in $asmfiles; do
@@ -281,7 +280,7 @@ function compile_asm() {
     done
 }
 
-function make_disk_image() {
+function mkiso() {
 
 	limine="./bootloader/limine/limine-$(uname)-$(uname -m)"		#	platform dependent binary
 	path_limine="$(pwd)/bootloader"
@@ -291,7 +290,81 @@ function make_disk_image() {
 		return 1
 	fi
 
+	if [ ! -e "./iso" ]; then
+		output="$(mkdir -p ./iso/EFI ./iso/EFI/BOOT ./iso/boot ./iso/boot/limine)"
+		if [ "$?" != 0 ]; then
+			error "unable to create directory structure for ISO creation"
+			echo "command output: $output"
+			return 1
+		fi
+	fi
 
+	output="$(cp $kernel ./iso/boot/)"
+	if [ "$?" != 0 ]; then
+		error "failed to copy kernel"
+		echo "output: $output"
+		return 1
+	fi
+
+	if [ "$debug" == 1 ]; then
+		local config="$path_limine/configs/limine-debug.conf"
+	else
+		local config="$path_limine/configs/limine.conf"
+	fi
+
+	output="$(cp $config $path_limine/limine-bios.sys ./iso/boot/limine)"
+	if [ "$?" != 0 ]; then
+		error "failed to copy bootloader config"
+		echo "output: $output"
+		return 1
+	fi
+
+	output="$(cp $path_limine/BOOTX64.EFI ./iso/EFI/BOOT)"
+	if [ "$?" != 0 ]; then
+		error "failed to copy BOOTX64.EFI"
+		echo "output: $output"
+		return 1
+	fi
+
+	#	place limine CDs into the iso
+	output="$(cp ./bootloader/limine-bios-cd.bin ./bootloader/limine-uefi-cd.bin ./iso)"
+	if [ "$?" != 0 ]; then
+		error "failed to copy limine CDs"
+		echo "output: $output"
+		return 1
+	fi
+
+
+	#	create iso
+	output="$(xorriso -as mkisofs -R -r -J -b limine-bios-cd.bin\
+	-no-emul-boot -boot-load-size 4 -boot-info-table -hfsplus -apm-block-size 2048\
+	--efi-boot limine-uefi-cd.bin -efi-boot-part --efi-boot-image\
+	--protective-msdos-label $PWD/iso -o $image)"
+	if [ "$?" != 0 ]; then
+		error "failed to create iso"
+		echo "output: $output"
+		return 1
+	fi
+
+	#	install limine
+	output="$($limine bios-install $image)"
+	if [ "$?" != 0 ]; then
+	 	error "failed to install bootloader"
+	 	echo limine output:
+	 	echo $output
+	 	return 1
+	fi
+
+	note "ISO create successfully"
+
+	return 0
+
+
+
+
+
+
+#	old code (too scared to remove it)
 
 	# #	create file
 	# dd if=/dev/zero "of=$image" bs=1M count=0 "seek=$DISK_IMAGE_SIZE" > /dev/null 2>&1
@@ -322,79 +395,79 @@ function make_disk_image() {
 	# 	return 1
 	# fi
 
-	if [ ! -e "$image" ]; then
-		cp ./files/.template-img.img "$image"
-		if [ "$?" != 0 ]; then
-			error "failed to copy template disk image"
-			echo command output:
-			echo $output
-			return 1
-		fi
-	fi
+	# if [ ! -e "$image" ]; then
+	# 	cp ./files/.template-img.img "$image"
+	# 	if [ "$?" != 0 ]; then
+	# 		error "failed to copy template disk image"
+	# 		echo command output:
+	# 		echo $output
+	# 		return 1
+	# 	fi
+	# fi
 
 
-	#	install limine
-	output="$($limine bios-install $image)"
-	if [ "$?" != 0 ]; then
-		error "failed to install bootloader"
-		echo limine output:
-		echo $output
-		return 1
-	fi
+	# #	install limine
+	# output="$($limine bios-install $image)"
+	# if [ "$?" != 0 ]; then
+	# 	error "failed to install bootloader"
+	# 	echo limine output:
+	# 	echo $output
+	# 	return 1
+	# fi
 
-	output="$(mformat -i "$image@@1M")"
-	if [ "$?" != 0 ]; then
-		error "failed to format device"
-		echo command output:
-		echo $output
-		return 1
-	fi
+	# output="$(mformat -i "$image@@1M")"
+	# if [ "$?" != 0 ]; then
+	# 	error "failed to format device"
+	# 	echo command output:
+	# 	echo $output
+	# 	return 1
+	# fi
 
-	#	create subdirs
-	output="$(mmd -i "$image@@1M" ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine)"
-	if [ "$?" != 0 ]; then
-		error "failed to create subdirectories"
-		echo command output:
-		echo $output
-		return 1
-	fi
+	# #	create subdirs
+	# output="$(mmd -i "$image@@1M" ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine)"
+	# if [ "$?" != 0 ]; then
+	# 	error "failed to create subdirectories"
+	# 	echo command output:
+	# 	echo $output
+	# 	return 1
+	# fi
 
-	#	copy kernel
-	output="$(mcopy -i "$image@@1M" "$kernel" ::/boot)"
-	if [ "$?" != 0 ]; then
-		error "failed to copy kernel"
-		echo command output:
-		echo $output
-		return 1
-	fi
-
-
-	#	copy bl config
-	if [ "$debug" == 1 ]; then
-		local config="$path_limine/configs/limine-debug.conf"
-	else
-		local config="$path_limine/configs/limine.conf"
-	fi
-
-	output="$(mcopy -i "$image@@1M" $config $path_limine/limine-bios.sys ::/boot/limine)"
-	if [ "$?" != 0 ]; then
-		error "failed to copy bootloader configuration"
-		echo command output:
-		echo $output
-		return 1
-	fi
+	# #	copy kernel
+	# output="$(mcopy -i "$image@@1M" "$kernel" ::/boot)"
+	# if [ "$?" != 0 ]; then
+	# 	error "failed to copy kernel"
+	# 	echo command output:
+	# 	echo $output
+	# 	return 1
+	# fi
 
 
-	output="$(mcopy -i "$image@@1M" $path_limine/BOOTX64.EFI ::/EFI/BOOT)"
-	if [ "$?" != 0 ]; then
-		error "failed to copy bootloader entrypoint"
-		echo command output:
-		echo $output
-		return 1
-	fi
+	# #	copy bl config
+	# if [ "$debug" == 1 ]; then
+	# 	local config="$path_limine/configs/limine-debug.conf"
+	# else
+	# 	local config="$path_limine/configs/limine.conf"
+	# fi
+
+	# output="$(mcopy -i "$image@@1M" $config $path_limine/limine-bios.sys ::/boot/limine)"
+	# if [ "$?" != 0 ]; then
+	# 	error "failed to copy bootloader configuration"
+	# 	echo command output:
+	# 	echo $output
+	# 	return 1
+	# fi
 
 
-	note "disk image generation completed"
+	# output="$(mcopy -i "$image@@1M" $path_limine/BOOTX64.EFI ::/EFI/BOOT)"
+	# if [ "$?" != 0 ]; then
+	# 	error "failed to copy bootloader entrypoint"
+	# 	echo command output:
+	# 	echo $output
+	# 	return 1
+	# fi
+
+
+	# note "disk image generation completed"
 
 
 	return 0
@@ -456,7 +529,7 @@ function build() {
 	note "kernel compilation succeeded"
 
 
-	make_disk_image
+	mkiso
 	if [ "$?" != 0 ]; then error "failed to create disk image"; return 1; fi
 
 	if [ $emulate -eq 1 ]; then
@@ -542,27 +615,18 @@ function dependencies() {
 			local rup=NONE	#	rustup
 			local compiler=NONE	#	x86_64-elf-gcc also installs x86_64-elf-ld
 			local nasm=NONE
-			local mtools_path=NONE
+			local xorriso=NONE
 			
 			for i in $PATH; do
 
 				#	find each tool needed for build
 
-				if [ -e "$i/brew" ]; then
-					local brew="$i/brew"
-				fi
-				if [ -e "$i/rustup" ]; then
-					local rup="$i/rustup"
-				fi
-				if [ -e "$i/x86_64-elf-gcc" ]; then
-					local compiler="$i/x86_64-elf-gcc"
-				fi
-				if [ -e "$i/nasm" ]; then
-					local nasm="$i/nasm"
-				fi
-				if [ -e "$i/mcopy" ]; then
-					local mtools_path="$i"
-				fi
+				if [ -e "$i/brew" ]; then local brew="$i/brew"; fi
+				if [ -e "$i/rustup" ]; then local rup="$i/rustup"; fi
+				if [ -e "$i/x86_64-elf-gcc" ]; then local compiler="$i/x86_64-elf-gcc"; fi
+				if [ -e "$i/nasm" ]; then local nasm="$i/nasm"; fi
+				if [ -e "$i/xorriso" ]; then local xorriso="$i/xorriso"; fi
+
 			done
 			
 
@@ -635,17 +699,14 @@ function dependencies() {
 				note "nasm is already installed"
 			fi
 
-			if [ "$mtools_path" == NONE ]; then
-				note "installing mtools (needed for constructing disk image)"
-				output="$($brew install mtools)"
+			if [ "$xorriso" == NONE ]; then
+				note "installong xorriso"
+				output="$($brew install xorriso)"
 				if [ "$?" != 0 ]; then
-					error "failed to install mtools"
-					echo brew output:
-					echo $output
+					error "failed to install xorriso"
+					echo "output: $output"
 					return 1
 				fi
-				echo "mtools installed"
-				echo
 			fi
 
 			if [ "$all" -eq 1 ]; then
@@ -970,8 +1031,11 @@ function info() {
 function help() {
 
 	if [ "${#subcmdargs[@]}" == 0 ]; then
+		echo "$(green $0) is simple script used to build and manage project"
+		echo "	$(magenta NOTE): this script should always be run in project root directory"
+		echo; echo
 		echo "$(green $0) $(blue info) - show information about project"
-		echo "$(green $0) $(blue setup) - setup baseOS"
+		echo "$(green $0) $(blue setup) - setup the project"
 		echo "$(green $0) $(blue build) - build OS"
 		echo "$(green $0) $(red test) - run tests"
 		echo "$(green $0) $(blue run) - run OS in emulator"
@@ -992,20 +1056,20 @@ function help() {
 	for i in "${subcmdargs[@]}"; do
 		case $i in
 			"info")
-				echo "$(green $0) $(blue info)"
+				echo "$(green $0) $(blue $i)"
 				echo "	$(yellow 'prints info about the project')"
 				echo "	$(green "$0 info") $(blue os) prints info about the OS"
 				echo "	$(green "$0 info") $(blue kernel) info about the kernel"
 			;;
 			"setup")
-				echo "$(green $0) $(blue config)"
+				echo "$(green $0) $(blue $i)"
 				echo "	$(yellow 'configures project for specific language and/or architecture')"
 				echo "	$(green $0 config) $(blue "<lang> <arch>")"
 				echo "		languages: $(green c), $(red rust) (only C is currently implemented)"
 				echo "		architectures: $(green x86_64), $(red arm64) (only x86_64 is currently implemented)"
 			;;
 			"build")
-				echo "$(green $0) $(blue build)"
+				echo "$(green $0) $(blue $i)"
 				echo "	$(yellow 'builds the OS')"
 				echo "	$(blue debug) builds the OS with debug options"
 				echo "	'$(blue run)' to run the OS in emulator"
@@ -1014,16 +1078,16 @@ function help() {
 				echo "		for more info use $(green "$0 help") $(blue compiler)"
 			;;
 			"test")
-				echo "$(green $0) $(blue test)"
+				echo "$(green $0) $(blue $i)"
 				echo "	$(yellow 'run tests') $(red "(rust only) (not implemented yet)")"
 			;;
 			"run")
-				echo "$(green $0) $(blue run)"
+				echo "$(green $0) $(blue $i)"
 				echo "	$(yellow 'runs the OS in emulator')"
 				echo "	'$(blue dbg)' to attach debugger"
 			;;
 			"change")
-				echo "$(green $0) $(blue change)"
+				echo "$(green $0) $(blue $i)"
 				echo "	$(yellow 'change project information or configuration')"
 				echo "		$(blue OS) $(magenta name) $(cyan "<name>") - changes OS name in all configurations and files"
 				echo "		$(blue OS) $(magenta version) $(cyan "<version>") - changes OS version"
@@ -1034,13 +1098,13 @@ function help() {
 				echo "		$(blue kernel) $(magenta version) $(cyan "<version>")	- changes kernel version"
 			;;
 			"dependencies")
-				echo "$(green $0) $(blue dependencies)"
+				echo "$(green $0) $(blue $i)"
 				echo "	$(yellow 'manage build dependencies on supported systems')"
 				echo "	$(blue install) - install required dependencies"
 				echo "		$(blue "all") - installs optional dependencies (emulator, debugger, etc.)"
 			;;
 			*)
-				echo "$(yellow "unknown token") '$(blue $i)'"
+				echo "$(yellow "unknown subcommand") '$(blue $i)'"
 				subcmdargs=()
 				help 1
 			;;
@@ -1067,9 +1131,7 @@ function help() {
 
 
 
-
-
-
+#	SCRIPT ENTRY POINT
 
 if [ "$#" -eq 0 ]; then
 	echo "$(red ERROR): no subcommand given"
@@ -1078,10 +1140,7 @@ if [ "$#" -eq 0 ]; then
 fi
 
 output=""
-kernel_name="$(cat ./kernel/name)"
-kernel="./files/$kernel_name.bin"
-echo kernel name: $kernel_name
-echo kernel: $kernel
+
 
 
 if  [ -e "$UTIL_CONFIG_FILE" ]; then
@@ -1158,5 +1217,9 @@ if [[ "$?" != 0 ]]; then
 fi
 
 
+# TODO
+#	add backup and restore options
+#	add -remove option to setup subcommand
 
-#	TODO: add specific config file for compiler parameters
+
+#	iso creation:	https://github.com/limine-bootloader/limine/blob/v9.x/USAGE.md
