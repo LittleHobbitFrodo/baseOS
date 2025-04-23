@@ -9,10 +9,7 @@ pub const KB: usize = 1024;
 pub const MB: usize = 1024 * 1024;
 pub const GB: usize = 1024 * 1024 * 1024;
 
-#[macro_export]
-macro_rules! align {
-    ($addr:expr, $algn:expr) => {
-        (($addr + ($algn-1)) & !($algn-1))
-    };
-}
 
+
+
+pub use core::mem::needs_drop;

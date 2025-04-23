@@ -15,7 +15,13 @@ use crate::renderer::RENDERER;
 
 fn init() {
 
-    let mut rend = unsafe {RENDERER.borrow_mut()};
+    if let Ok(mut rend) = RENDERER.try_lock() {
+        if let Ok(_) = rend.init(&bootloader::FRAMEBUFFER) {
+            //  👍
+        } else {
+            //  whatever
+        }
+    }
 
 
 }
@@ -31,11 +37,9 @@ extern "C" fn _start() {
 }
 
 pub fn panic(code: PanicCode, msg: &[u8]) -> ! {
-    let rend = match RENDERER.acquire_mut() {
-        Some(rend) => rend,
-        None => {
-            hang();
-        }
+    let mut rend = match RENDERER.try_lock() {
+        Ok(rend) => rend,
+        Err(_) => hang(),
     };
     rend.set_color_rgb(255, 0, 0);
 

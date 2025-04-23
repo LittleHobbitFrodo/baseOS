@@ -2,10 +2,10 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
-use core::cell::RefCell;
+use crate::sync::Mutex;
 use crate::limine;
 use crate::font;
-pub use crate::cell::SyncCell;
+//pub use crate::cell::SyncCell;
 
 pub const TAB_SIZE: usize = 6;
 pub const SPACE_BETWEEN_LINES: u32 = 3;
@@ -84,6 +84,9 @@ pub struct Renderer {
     col: Color,
     space: u32,
 }
+
+unsafe impl Sync for Renderer {}
+unsafe impl Send for Renderer {}
 
 impl Renderer {
     pub const fn new() -> Self {
@@ -184,7 +187,7 @@ impl AsRef<Renderer> for Renderer {
 impl AsMut<Renderer> for Renderer {
     #[inline(always)]
     fn as_mut(&mut self) -> &mut Renderer {
-        &mut self
+        self
     }
 }
 pub trait Render {
@@ -194,6 +197,7 @@ pub trait Render {
 }
 
 
-pub static mut RENDERER: Renderer = Renderer::new();
+//pub static mut RENDERER: Renderer = Renderer::new();
+pub static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
 //pub static mut RENDERER: SyncCell<Renderer> = SyncCell::new(Renderer::new());
 

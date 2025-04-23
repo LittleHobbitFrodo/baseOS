@@ -219,7 +219,9 @@ function compile_c() {
 		local arch="aarch64"
 	fi
 
-	local compiler_params=("-I$PWD/kernel/" "-ffreestanding" "-fPIE" "-nostdlib" "-nostartfiles" "-mgeneral-regs-only" "-march=$arch" "-Wall" "-Wextra" "-DKERNEL_NAME=$(cat ./kernel/name)" "-DKERNEL_VERSION=$(cat ./kernel/version)" "-DOS_NAME=$os_name" "-DOS_VERSION=os_version" "-DOS_RELEASE=$os_release" "-fno-exceptions" "-m64" "-c")
+	local compiler_params=("-I$PWD/kernel/" "-ffreestanding" "-fPIE" "-nostdlib" "-nostartfiles" "-mgeneral-regs-only"
+	"-march=$arch" "-Wall" "-Wextra" "-DKERNEL_NAME=$(cat ./kernel/name)" "-DKERNEL_VERSION=$(cat ./kernel/version)"
+	"-DOS_NAME=$os_name" "-DOS_VERSION=os_version" "-DOS_RELEASE=$os_release" "-fno-exceptions" "-m64" "-c")
 
 	if [ "$debug" == 0 ]; then
 		local additional_params=("-finline-functions" "-O3" "-llibrary")
@@ -233,6 +235,10 @@ function compile_c() {
 		error "kernel compilation failed"
 		echo compiler output:
 		echo $output
+		if [ "$(echo $output | wc -c)" -gt 1000 ]; then
+			echo $output > output.txt
+			note "compiler output was put to output.txt file"
+		fi
 		return 1
 	fi
 
@@ -246,6 +252,10 @@ function compile_rust() {
 	error "failed to build kernel"
 	echo compiler output:
 	echo $output
+	if [ "$(echo $output | wc -c)" -gt 1000 ]; then
+		echo $output > output.txt
+		note "compiler output was put to output.txt file"
+	fi
 	return 1; 
 	fi
 

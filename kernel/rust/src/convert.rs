@@ -22,7 +22,9 @@ pub trait ConvertMut<T>: Sized {
 impl Render for u8 {
     #[inline(always)]
     fn render(&self) {
-        unsafe {RENDERER.acquire_mut().acquire_mut().render(*self)};
+        if let Ok(mut r) = RENDERER.try_lock() {
+            r.render(*self);
+        }
     }
 }
 
@@ -31,24 +33,25 @@ macro_rules! implement_render_for_unsigned {
     ($type:ty, $ln:expr) => {
         impl Render for $type {
             fn render(&self) {
-                let rend = unsafe {crate::renderer::RENDERER.acquire_mut().acquire_mut()};
-                if *self == 0 {
-                    rend.render(b'0');
-                }
-                let mut num = *self;
-                let mut index: isize = 0;
-                let mut arr = [0u8; $ln];
+                if let Ok(mut rend) = RENDERER.try_lock() {
+                    if *self == 0 {
+                        rend.render(b'0');
+                    }
+                    let mut num = *self;
+                    let mut index: isize = 0;
+                    let mut arr = [0u8; $ln];
 
-                loop {
-                    arr[index as usize] = (num % 10) as u8 + b'0';
-                    num /= 10;
-                    if num == 0 { break; }
-                    index += 1;
-                }
+                    loop {
+                        arr[index as usize] = (num % 10) as u8 + b'0';
+                        num /= 10;
+                        if num == 0 { break; }
+                        index += 1;
+                    }
 
-                while index >= 0 {
-                    rend.render(arr[index as usize]);
-                    index -= 1;
+                    while index >= 0 {
+                        rend.render(arr[index as usize]);
+                        index -= 1;
+                    }
                 }
             }
         }
@@ -59,28 +62,29 @@ macro_rules! implement_render_for_signed {
     ($type:ty, $ln:expr) => {
         impl Render for $type {
             fn render(&self) {
-                let rend = unsafe {RENDERER.acquire_mut().acquire_mut()};
-                if *self == 0 {
-                    rend.render(b'0');
-                }
-                let mut num = *self;
-                if num < 0 {
-                    num = -num;
-                    rend.render(b'-');
-                }
-                let mut index: isize = 0;
-                let mut arr = [0u8; $ln];
+                if let Ok(mut rend) = RENDERER.try_lock() {
+                    if *self == 0 {
+                        rend.render(b'0');
+                    }
+                    let mut num = *self;
+                    if num < 0 {
+                        num = -num;
+                        rend.render(b'-');
+                    }
+                    let mut index: isize = 0;
+                    let mut arr = [0u8; $ln];
 
-                loop {
-                    arr[index as usize] = (num % 10) as u8 + b'0';
-                    num /= 10;
-                    if num == 0 { break; }
-                    index += 1;
-                }
+                    loop {
+                        arr[index as usize] = (num % 10) as u8 + b'0';
+                        num /= 10;
+                        if num == 0 { break; }
+                        index += 1;
+                    }
 
-                while index >= 0 {
-                    rend.render(arr[index as usize]);
-                    index -= 1;
+                    while index >= 0 {
+                        rend.render(arr[index as usize]);
+                        index -= 1;
+                    }
                 }
             }
         }

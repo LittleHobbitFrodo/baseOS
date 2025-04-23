@@ -7,7 +7,6 @@
 #![no_std]
 #![no_main]
 #![allow(static_mut_refs)]
-#[macro_use]
 
 //  used traits
 pub use core::clone::Clone;
@@ -26,42 +25,11 @@ pub mod io;
 pub mod limine;
 pub mod manage;
 pub mod renderer;
-pub mod memory;
+pub mod mem;
 
 pub mod convert;
 pub mod sync;
 
-/// integer traits
-trait Integer: Sized + Copy + PartialEq + PartialOrd + Add<Output=Self>
-+ AddAssign + Sub<Output=Self> + Not<Output=Self> + BitAnd<Output=Self> + BitOr<Output=Self>
-+ BitXor<Output=Self> + Div<Output=Self> + Mul<Output=Self> + Shl<Output=Self> + Shr<Output=Self> {}
-
-impl Integer for u8 {}
-impl Integer for u16 {}
-impl Integer for u32 {}
-impl Integer for u64 {}
-impl Integer for usize {}
-impl Integer for i8 {}
-impl Integer for i16 {}
-impl Integer for i32 {}
-impl Integer for i64 {}
-impl Integer for isize {}
-
-
-trait Unsigned: Integer {}
-impl Unsigned for u8 {}
-impl Unsigned for u16 {}
-impl Unsigned for u32 {}
-impl Unsigned for u64 {}
-impl Unsigned for usize {}
-
-
-trait Signed: Integer {}
-impl Signed for i8 {}
-impl Signed for i16 {}
-impl Signed for i32 {}
-impl Signed for i64 {}
-impl Signed for isize {}
 
 
 
