@@ -21,6 +21,7 @@ fn init() {
         } else {
             //  whatever
         }
+        rend.printstr(b"hello world!");
     }
 
 

@@ -247,7 +247,8 @@ function compile_c() {
 function compile_rust() {
 	cd $path
 
-	output="$(cargo build --release --target-dir bin)"
+	echo arch: $os_arch
+	output="$(cargo build --release --target-dir bin --verbose --target $os_arch-unknown-none)"
 	if [ "$?" != 0 ]; then
 	error "failed to build kernel"
 	echo compiler output:
@@ -533,7 +534,7 @@ function build() {
 
 	#	link files together
 	if [ "$os_lang" != "rust" ]; then
-    	find "./tmp/kernel" -name "*.o" -print0 | xargs -0 $linker -m "elf_$os_arch" -nostdlib -static --no-dynamic-linker -z text -z max-page-size=0x1000 -T "$path/linker.ld" -o "$kernel"
+    	find "./tmp/kernel" -name "*.o" -print0 | xargs -0 $linker -m "elf_$os_arch" -nostdlib -static --no-dynamic-linker -z text -z max-page-size=0x1000 -T "$PWD/kernel/linker.ld" -o "$kernel"
 		if [ "$?" != 0 ]; then error "failed to link files"; return 1; fi
 	fi
 	note "kernel compilation succeeded"
