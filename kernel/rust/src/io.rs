@@ -7,6 +7,7 @@ use core::arch::asm;
 
 pub mod int {
     use core::arch::asm;
+    
     #[inline(always)]
     pub fn disable() {
         unsafe { asm!("cli"); }

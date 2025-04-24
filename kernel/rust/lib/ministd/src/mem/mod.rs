@@ -1,4 +1,4 @@
-//	memory/mod.rs
+//	mem/mod.rs (ministd crate)
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
@@ -8,8 +8,6 @@
 pub const KB: usize = 1024;
 pub const MB: usize = 1024 * 1024;
 pub const GB: usize = 1024 * 1024 * 1024;
-
-
 
 
 pub use core::mem::needs_drop;

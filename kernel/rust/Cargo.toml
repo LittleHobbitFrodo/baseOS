@@ -15,3 +15,7 @@ panic = "abort"
 
 
 [dependencies]
+#   ministd crate
+ministd={path="lib/ministd"}
+limine_rs={path="lib/limine"}
+bootloader={path="lib/bootloader"}

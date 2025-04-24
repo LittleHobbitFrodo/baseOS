@@ -2,7 +2,7 @@
 
 //! Auxiliary types for the [SMP request](crate::request::SmpRequest).
 
-use crate::limine::mp;
+use crate::mp;
 
 #[deprecated(since = "0.4.0", note = "please use `limine::mp::GotoAddress` instead")]
 /// A function pointer that the core will jump to when it is written to.

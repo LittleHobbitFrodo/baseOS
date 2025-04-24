@@ -1,4 +1,4 @@
-//	sync.rs
+//	mutex.rs (ministd crate)
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
@@ -20,7 +20,7 @@ use core::sync::atomic::Ordering;
 
 pub struct Mutex<T: Sized> {
     data: UnsafeCell<T>,
-    flags: MutexFlags,
+    //flags: MutexFlags,
     lock: AtomicBool,
 }
 
@@ -38,7 +38,7 @@ unsafe impl<T: Sized + Send> Sync for Mutex<T> {}
 impl<T: Sized> Mutex<T> {
     #[inline]
     pub const fn new(data: T) -> Self {
-        Self { data: UnsafeCell::new(data), flags: MutexFlags::new(), lock: AtomicBool::new(false)}
+        Self { data: UnsafeCell::new(data), lock: AtomicBool::new(false), /*flags: MutexFlags::new()*/}
     }
     pub fn get_cloned(&mut self) -> Result<T, ()>
     where T: Copy {
@@ -78,21 +78,10 @@ impl<T: Sized> Mutex<T> {
         }
     }
 
-    #[inline(always)]
+    /*#[inline(always)]
     pub fn is_poisoned(&self) -> bool {
         self.flags.is_poisoned()
-    }
-
-    /*#[inline]
-    pub fn into_inner(self) -> T {
-        *self.data.get_mut()
     }*/
-
-    //#[inline]         //  TODO: MutexGuardMut<T>
-    //pub fn get_mut(&mut self) -> 
-
-
-
 
     //  implementation functions
 
@@ -169,7 +158,13 @@ impl<T: Sized> Drop for Mutex<T> {
 }
 
 
-pub struct MutexGuard<'mux, T: Sized + Sync> {
+
+
+
+
+
+#[must_use="if MutexGuard is unused its Mutex will immediately unlock"]
+pub struct MutexGuard<'mux, T: Sized + Sync + 'mux> {
     lock: &'mux Mutex<T>,
     data: &'mux UnsafeCell<T>,
 }
@@ -208,6 +203,12 @@ impl<'mux, T: Sized + Sync> DerefMut for MutexGuard<'mux, T> {
         unsafe {self.data.get().as_mut()}.unwrap()
     }
 }
+
+
+
+
+
+/*
 
 /// # Bits
 /// 7th = borrowed as mut  
@@ -292,79 +293,4 @@ impl MutexFlags {
         self.0 |= 2 << 5;
     }
 
-}
-
-
-/*struct MutexFlags(u64);
-/// flags for Mutex wrapper
-
-
-impl MutexFlags {
-    const RC_MASK: u64 = 0x1FFFFFFFFFFFFFFF;
-    pub const fn new() -> Self {
-        Self(0)
-    }
-
-    /// flag access
-    #[inline(always)]
-    pub fn flag_set(&mut self, flag: Flags) {
-        self.0 |= 1 << flag as u64;
-    }
-    #[inline(always)]
-    pub fn flag_clear(&mut self, flag: Flags) {
-        self.0 &= !(1 << flag as u64)
-    }
-
-    /// get reference count
-    #[inline(always)]
-    pub fn rc(&self) -> u64 {
-        self.0 & Self::RC_MASK
-    }
-
-    /// set ref count
-    #[inline(always)]
-    pub fn rc_set(&mut self, rc: u64) {
-        self.0 &= !Self::RC_MASK;
-        self.0 |= rc & Self::RC_MASK;
-    }
-
-    /// clear ref count
-    #[inline(always)]
-    pub fn rc_clear(&mut self) {
-        self.0 &= !Self::RC_MASK;
-    }
-
-    /// add references
-    #[inline(always)]
-    pub fn rc_add(&mut self, add: u64) {
-        let mut rc = self.rc();
-        rc += add;
-        self.rc_set(rc);
-    }
-}
-
-impl core::ops::AddAssign<u64> for MutexFlags {
-    #[inline]
-    fn add_assign(&mut self, add: u64) {
-        let mut rc = self.rc();
-        rc += add;
-        self.rc_set(rc);
-    }
-}
-
-impl core::ops::SubAssign<u64> for MutexFlags {
-    #[inline]
-    fn sub_assign(&mut self, sub: u64) {
-        let mut rc = self.rc();
-        rc -= sub;
-        self.rc_set(rc);
-    }
-}
-
-enum Flags {
-    MutRef = 61,
-    State = 63 | 62,
-}
-
-*/
-
+}*/

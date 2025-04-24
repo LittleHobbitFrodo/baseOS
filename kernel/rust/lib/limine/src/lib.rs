@@ -58,6 +58,7 @@
 
 // `Default` is not const anyway, so implementing is not very useful.
 #![allow(clippy::new_without_default)]
+#![no_std]
 
 use core::cell::UnsafeCell;
 

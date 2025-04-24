@@ -6,7 +6,7 @@ use core::{
     time::Duration,
 };
 
-use crate::limine::{
+use crate::{
     file,
     firmware_type::FirmwareType,
     framebuffer::{Framebuffer, RawFramebuffer},

@@ -2,7 +2,7 @@
 
 use core::{cell::UnsafeCell, ptr::NonNull};
 
-use crate::limine::{modules::InternalModule, mp, paging, response::*};
+use crate::{modules::InternalModule, mp, paging, response::*};
 
 macro_rules! impl_base_fns {
     ($latest_revision:expr, $response:ty, $magic:expr, { $($(#[$attr:meta])* $field:ident: $val:expr),* $(,)? }) => {

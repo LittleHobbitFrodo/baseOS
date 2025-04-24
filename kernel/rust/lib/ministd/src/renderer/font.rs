@@ -1,8 +1,8 @@
-//	font.rs
+//	font.rs (ministd crate)
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
-use ministd::sync::rwlock::RwLock;
+use crate::sync::RoSync;
 
 pub const FONT_BITS: usize = 8;
 pub const PLACE_SUB: usize = 31;
@@ -13,14 +13,14 @@ pub struct Font([FontChar; FONT_SIZE]);
 
 impl Font {
     #[inline(always)]
-    pub fn get_char(&self, i: u8) -> Option<&FontChar> {
-        Some(&self.0[i as usize - PLACE_SUB as usize])
+    pub fn get_char(&self, i: u8) -> &FontChar {
+        &self.0[i as usize - PLACE_SUB as usize]
     }
 }
 
 
 
-pub static FONT: RwLock<Font> = RwLock::new(Font {0: [
+pub static FONT: RoSync<Font> = RoSync::new(Font {0: [
     /*each bit is one pixel, set bits will be drawn*/
     /*null byte*/[0, 0, 0, 0, 0, 0, 0, 0],
     /*space*/[0, 0, 0, 0, 0, 0, 0, 0],
