@@ -1,8 +1,14 @@
-//	font.rs (ministd crate)
+//	renderer/font.rs (ministd crate)
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
-use crate::sync::RoSync;
+
+//  This file provides simple 8x8 font for the renderer
+//  You can change the font
+//  NOTE: the font contains only printable characters (according to the ASCII table)
+
+
+use crate::mem::RoSync;
 
 pub const FONT_BITS: usize = 8;
 pub const PLACE_SUB: usize = 31;

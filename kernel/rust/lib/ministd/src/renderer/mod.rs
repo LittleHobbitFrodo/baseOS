@@ -14,3 +14,6 @@ pub mod renderer;
 pub use renderer::RENDERER;
 pub use renderer::Render;
 
+pub fn init() -> Result<(), ()> {
+    renderer::init()
+}

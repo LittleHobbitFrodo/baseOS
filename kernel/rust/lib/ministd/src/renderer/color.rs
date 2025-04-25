@@ -1,6 +1,9 @@
-//	color.rs (ministd crate)
+//	renderer/color.rs (ministd crate)
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
+
+
+//  this file provides simple [`Color`] structure to use with the renderer
 
 use crate::renderer::{Render, RENDERER};
 

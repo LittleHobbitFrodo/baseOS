@@ -1,8 +1,15 @@
-//	io.h
+//	io/mod.rs (ministd crate)
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
+
+
+//  this module provides basic IO functionalities
+//      such as [`in`] and [`out`] instructions and better text rendering
+
 use core::arch::asm;
+
+pub mod text;
 
 
 pub mod int {

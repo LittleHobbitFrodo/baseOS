@@ -2,7 +2,6 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
-use crate::sync::Mutex;
 use limine_rs as limine;
 use crate::renderer::font;
 
@@ -20,7 +19,7 @@ pub trait Render {
 
 
 //pub static mut RENDERER: Renderer = Renderer::new();
-pub static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
+pub static RENDERER: spin::Mutex<Renderer> = spin::Mutex::new(Renderer::new());
 //pub static mut RENDERER: SyncCell<Renderer> = SyncCell::new(Renderer::new());
 
 
@@ -48,15 +47,17 @@ impl Renderer {
         }
     }
 
-    pub fn init(&mut self, fb: &limine::request::FramebufferRequest) {
+    fn init(&mut self, fb: &limine::request::FramebufferRequest) -> Result<(), ()> {
         self.col = Color::new_rgb(255, 255, 255);
         self.row = 0;
         self.line = 0;
         self.space = SPACE_BETWEEN_LINES;
         if let Ok(_) = FrameBuffer::init(&mut self.fb, fb) {
             self.initialized = true;
+            Ok(())
         } else {
             self.initialized = false;
+            Err(())
         }
     }
 
@@ -66,17 +67,19 @@ impl Renderer {
     #[inline(always)] pub fn color(&self) -> Color { self.col }
     #[inline(always)] pub fn set_color(&mut self, color: u32) {self.col.set_int(color);}
 
-    pub fn space(&mut self) {
+    fn space(&mut self) {
         self.row += 1;
         if self.row >= self.fb.width {
             self.row = 0;
             self.line += 1;
         }
     }
+    #[inline]
     pub fn endl(&mut self) {
         self.line += 1;
         self.row = 0;
     }
+    #[inline]
     pub fn tab(&mut self) {
         self.row += TAB_SIZE - (self.row % TAB_SIZE);
         if self.row >= self.fb.width {
@@ -125,11 +128,19 @@ impl Renderer {
     }
 
     #[inline(always)]
-    pub fn printstr(&mut self, str: &[u8]) {
+    pub fn print(&mut self, str: &[u8]) {
         if self.initialized {
             for i in 0..str.len() {
                 self.rend(str[i]);
             }
+        }
+    }
+    pub fn println(&mut self, str: &[u8]) {
+        if self.initialized {
+            for i in 0..str.len() {
+                self.rend(str[i]);
+            }
+            self.endl();
         }
     }
 }
@@ -185,4 +196,10 @@ impl FrameBuffer {
     pub fn address(&self) -> *mut Color {
         self.address
     }
+}
+
+
+#[inline(always)]
+pub fn init() -> Result<(), ()> {
+    RENDERER.lock().init(&bootloader::FRAMEBUFFER)
 }
