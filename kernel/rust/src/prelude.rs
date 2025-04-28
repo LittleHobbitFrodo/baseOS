@@ -23,3 +23,5 @@ pub use bootloader;
 pub use limine_rs as limine;
 
 
+pub use ministd::{print, println};
+

@@ -30,13 +30,13 @@ Development platforms:
 Features presented in kernel:
   - [x] **Renderer** - Displays text on screen, supports various formats
     - C and Rust
-  - [ ] **Allocator** - heap implementation
-    - None yet
+  - [x] **Allocator** - heap implementation
+    - Rust
   - [x] **BL API** - Ask bootloader for additional information
     - C and Rust
     - Thanks to Jason Youngberg for his *limine-rs* crate
-  - [ ] **Thread-safe Primitives** - ensures thread safety
-    - Currently working on rust implementation of Mutex
+  - [x] **Thread-safe Primitives** - ensures thread safety
+    - using spin
   - [ ] **Containers** - vector, hash map, safe pointers and other primitives
     - None yet
   - [ ] **Cells** - Sharable mutable containers
@@ -67,5 +67,5 @@ You can sublicence this software freely
 
 I (@LittleHobbitFrodo) am not obliged to bear any consequences caused by this software or its possible malfunction
 
-### Post Script"
+### Post Script
 It would be nice if you mentioned that your project is based on my BaseOS :)

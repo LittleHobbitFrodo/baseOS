@@ -5,6 +5,29 @@
 
 ;;	this is where does the OS really start
 
+
+
+section .text
+	extern init
+	global _start
+
+_start:		;	entrypoint
+	cli		;	turn off interrupts
+
+	call init
+
+hang:	;	creates infinite loop to hang the kernel
+	cli
+	hlt
+	jmp hang
+
+
+
+
+
+
+
+
 section .text
 	extern init
 	extern kernel

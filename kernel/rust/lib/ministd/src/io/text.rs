@@ -6,6 +6,17 @@
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
-        
+        use core::fmt::Write;
+        use RENDERER;
+        let _ = write!(*RENDERER.lock(), $($arg)*);
     }};
+}
+
+#[macro_export]
+macro_rules! println {
+    ($($arg:tt)*) => {
+        use core::fmt::Write;
+        use RENDERER;
+        let _ = writeln!(*RENDERER.lock(), $($arg)*);
+    };
 }

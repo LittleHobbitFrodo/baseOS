@@ -23,7 +23,7 @@ extern "C" fn find_heap_region() -> Result<Region, ()> {
             match i.entry_type {
                 EntryType::USABLE => {
                     if (i.length as usize) > MB && (i.base as usize) < 4*GB {   //  4GB should be the boundary for HHDM
-                        return Ok(Region::new(i.base as usize + hhdm, i.length as usize));
+                        return Ok(Region::new(i.base as usize + hhdm, core::cmp::min(i.length as usize, 2*MB)));
                         //  add HHDM offset to be in virtual address space
                     }
                 },

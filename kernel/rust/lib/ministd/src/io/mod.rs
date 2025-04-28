@@ -9,6 +9,7 @@
 
 use core::arch::asm;
 
+#[macro_use]
 pub mod text;
 
 

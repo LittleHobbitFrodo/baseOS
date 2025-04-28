@@ -3,6 +3,7 @@
 //		an OS template on which to build
 
 use limine_rs as limine;
+use spin::MutexGuard;
 use crate::renderer::font;
 
 
@@ -11,10 +12,12 @@ use crate::renderer::color::Color;
 pub const TAB_SIZE: usize = 6;
 pub const SPACE_BETWEEN_LINES: u16 = 3;
 
+
+/// Helper trait for the [`Renderer`]
+/// - classic [`core::fmt::Display`] should be prefered
 pub trait Render {
-    /// simple trait for direct data rendering
-    /// no allocations fo primitive types
     fn render(&self);
+    fn render_locked<'l>(&self, guard: &'l mut MutexGuard<Renderer>);
 }
 
 
@@ -202,4 +205,20 @@ impl FrameBuffer {
 #[inline(always)]
 pub fn init() -> Result<(), ()> {
     RENDERER.lock().init(&bootloader::FRAMEBUFFER)
+}
+
+
+impl core::fmt::Write for Renderer {
+    #[inline]
+    fn write_char(&mut self, c: char) -> core::fmt::Result {
+        self.render(c as u8);
+        Ok(())
+    }
+
+    #[inline]
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        self.print(s.as_bytes());
+        Ok(())
+    }
+
 }

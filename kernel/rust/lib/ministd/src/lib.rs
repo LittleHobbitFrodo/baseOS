@@ -18,8 +18,15 @@
 //  used modules
 pub mod mem;
 pub mod renderer;
+#[macro_use]
 pub mod io;
-//pub use io::text::{print, println};
+pub mod string;
+pub mod convert;
+pub mod array;
+
+
+pub use string::String;
+pub use array::*;
 
 
 //  local crates

@@ -2,13 +2,12 @@
 //  this file originally belonged to baseOS project
 //      on OS template on which to build
 
-use core::alloc::Layout;
 
-use crate::bootloader;
-//use crate::cell::SyncCell;
 use ministd::{io, renderer::RENDERER};
 use crate::manage::panic;
-use ministd::mem::heap;
+use ministd::String;
+use ministd::{print, println};
+
 
 
 fn init() -> Result<(), ()> {
@@ -21,23 +20,16 @@ fn init() -> Result<(), ()> {
         panic(b"failed to initialize heap");
     }
 
-    let mut rend = RENDERER.lock();
-    rend.println(b"testing heap: ");
     
-    //  test allocation
-    if let Ok(alloc) = heap::HEAP.lock().alloc(Layout::from_size_align(8, 8).expect("heehee")) {
-        let mut arr: &mut [u8] = unsafe { core::slice::from_raw_parts_mut(alloc.as_ptr(), 8) };
-        let data = "deadbeef".as_bytes();
-        for i in 0..8 {
-            arr[i] = data[i];
-        }
 
-        rend.print(b"array: ");
-        rend.println(arr);
-        heap::HEAP.lock().dealloc(alloc, Layout::from_size_align(8, 8).expect("heehee"));
-    }
+    let string = match String::from_str(b"hello world!") {
+        Ok(s) => s,
+        Err(_) => {
+            return Err(());
+        },
+    };
 
-
+    println!("string: {}", string);
 
     Ok(())
 
