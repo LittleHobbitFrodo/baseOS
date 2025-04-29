@@ -25,6 +25,7 @@ pub mod convert;
 pub mod array;
 
 
+use renderer::RENDERER;
 pub use string::String;
 pub use array::*;
 
@@ -40,9 +41,10 @@ pub use spin::{Mutex, MutexGuard,
     RwLock, RwLockReadGuard, RwLockWriteGuard, RwLockUpgradableGuard,
     Lazy, Barrier, Once};
 
-
 use core::arch::asm;
 use core::hint::spin_loop;
+
+
 pub fn hang() -> ! {
     loop {
         io::int::disable();
@@ -51,3 +53,26 @@ pub fn hang() -> ! {
     }
 }
 
+unsafe extern "C" {
+    fn panic_handler(msg: &str);
+}
+
+pub fn panic(msg: &str) -> ! {
+
+    unsafe { RENDERER.force_unlock() };
+    unsafe { panic_handler(msg); }
+
+    hang();
+}
+
+
+
+#[macro_export]
+macro_rules! kernel_panic {
+    ($msg:literal) => {{
+        use super::ministd::{panic, print, println};
+        unsafe { RENDERER.force_unlock() };
+        println!("Panic occured at {}:{}", file!(), line!());
+        panic($msg)
+        }};
+}

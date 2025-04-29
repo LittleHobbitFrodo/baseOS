@@ -23,5 +23,7 @@ pub use bootloader;
 pub use limine_rs as limine;
 
 
-pub use ministd::{print, println};
+pub use ministd::{print, println, kernel_panic};
+
+pub use ministd as std;
 

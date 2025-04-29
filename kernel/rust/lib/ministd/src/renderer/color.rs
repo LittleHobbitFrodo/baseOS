@@ -5,6 +5,8 @@
 
 //  this file provides simple [`Color`] structure to use with the renderer
 
+use core::fmt::Display;
+
 use crate::renderer::{Render, RENDERER};
 
 #[derive(Copy, Clone)]
@@ -86,13 +88,3 @@ impl Color {
 }
 
 
-impl Render for Color {
-    #[inline(always)]
-    fn render(&self) {
-        RENDERER.lock().set_color(unsafe { self.clone().value.int });
-    }
-    #[inline(always)]
-    fn render_locked<'l>(&self, guard: &'l mut spin::MutexGuard<super::renderer::Renderer>) {
-        guard.set_color(self.as_int());
-    }
-}

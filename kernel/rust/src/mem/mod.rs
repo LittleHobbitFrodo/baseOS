@@ -8,7 +8,7 @@ use limine_rs::memory_map::EntryType;
 use ministd::mem::{MB, GB};
 
 /// Use this function to find an valid spot for heap
-/// Fell free to rewrite it!
+/// Feel free to rewrite it!
 /// - but do not change the declaration
 #[unsafe(no_mangle)]
 extern "C" fn find_heap_region() -> Result<Region, ()> {

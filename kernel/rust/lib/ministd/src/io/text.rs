@@ -3,20 +3,38 @@
 //		an OS template on which to build
 
 
+pub use core::fmt::write;
+
+/// formats and renders stuff onto the screen
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
         use core::fmt::Write;
-        use RENDERER;
-        let _ = write!(*RENDERER.lock(), $($arg)*);
+        let _ = write!(*super::ministd::renderer::RENDERER.lock(), $($arg)*);
     }};
 }
 
 #[macro_export]
 macro_rules! println {
-    ($($arg:tt)*) => {
+    ($($arg:tt)*) => {{
         use core::fmt::Write;
-        use RENDERER;
-        let _ = writeln!(*RENDERER.lock(), $($arg)*);
-    };
+        let _ = writeln!(*super::ministd::renderer::RENDERER.lock(), $($arg)*);
+    }};
+}
+
+/// uses lock renderer to print to screen
+#[macro_export]
+macro_rules! locked_print {
+    ($guard:expr, $($arg:tt)*) => {{
+        use core::fmt::Write;
+        let _ = write!($guard, $($arg)*);
+    }};
+}
+
+#[macro_export]
+macro_rules! locked_println {
+    ($guard:expr, $($arg:tt)*) => {{
+        use core::fmt::Write;
+        let _ = writeln!($guard, $($arg)*);
+    }};
 }

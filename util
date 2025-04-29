@@ -1229,8 +1229,9 @@ fi
 
 
 # TODO
-#	add backup and restore options
-#	add -remove option to setup subcommand
+#	rewrite
+#		configure will choose tools
+#		reconfigure will check the tools and posibly reconfigure the project
+#		tools in config file
 
-
-#	iso creation:	https://github.com/limine-bootloader/limine/blob/v9.x/USAGE.md
+#		split into multiple scripts: ./files/base/scripts/*

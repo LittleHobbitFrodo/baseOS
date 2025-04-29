@@ -6,7 +6,7 @@
 //  simple [`String`] implementation that uses ascii
 
 use core::{fmt::{Display, Error}, ops::{Bound, Deref, RangeBounds}, ptr, slice};
-use crate::{convert::Align, mem::heap::{self, ALLOC_ALIGN}};
+use crate::{convert::{strify, Align}, mem::heap::{self, ALLOC_ALIGN}};
 use crate::renderer::{RENDERER, Render};
 
 pub const DATA_ALIGN: u32 = ALLOC_ALIGN as u32;
@@ -309,22 +309,6 @@ impl Drop for String {
     }
 }
 
-
-impl Render for String {
-    #[inline]
-    fn render(&self) {
-        if let Some(data) = self.data {
-            RENDERER.lock().print( unsafe { slice::from_raw_parts(data, self.len as usize) } );
-        }
-    }
-    #[inline]
-    fn render_locked<'l>(&self, guard: &'l mut spin::MutexGuard<crate::renderer::renderer::Renderer>) {
-        if let Some(data) = self.data {
-            guard.print(unsafe { slice::from_raw_parts(data, self.len as usize) });
-        }
-    }
-}
-
 impl<'l> Deref for String {
     type Target=[u8];
     #[inline]
@@ -336,8 +320,9 @@ impl<'l> Deref for String {
 impl Display for String {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         if let Some(data) = self.data {
-            return write!(f, "{}", core::str::from_utf8(unsafe { slice::from_raw_parts(data, self.len as usize) }).unwrap());
+            return write!(f, "{}", strify(unsafe { slice::from_raw_parts(data, self.len as usize) }));
         }
         Err(Error::default())
     }
 }
+

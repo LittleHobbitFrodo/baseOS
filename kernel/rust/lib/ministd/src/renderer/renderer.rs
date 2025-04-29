@@ -64,11 +64,13 @@ impl Renderer {
         }
     }
 
-    #[inline(always)] pub fn row(&self) -> usize { self.row }
+    #[inline(always)] pub fn column(&self) -> usize { self.row }
     #[inline(always)] pub fn line(&self) -> usize { self.line }
     #[inline(always)] pub fn fb(&self) -> &FrameBuffer { &self.fb }
     #[inline(always)] pub fn color(&self) -> Color { self.col }
     #[inline(always)] pub fn set_color(&mut self, color: u32) {self.col.set_int(color);}
+
+
 
     fn space(&mut self) {
         self.row += 1;
@@ -87,6 +89,12 @@ impl Renderer {
         self.row += TAB_SIZE - (self.row % TAB_SIZE);
         if self.row >= self.fb.width {
             self.endl();
+        }
+    }
+
+    pub fn clear(&mut self) {
+        for i in unsafe { core::slice::from_raw_parts_mut(self.fb.address, self.fb.width*self.fb.height) } {
+            i.set_int(0);       //  black
         }
     }
 
@@ -221,4 +229,11 @@ impl core::fmt::Write for Renderer {
         Ok(())
     }
 
+}
+
+impl Renderer {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        self.print(s.as_bytes());
+        Ok(())
+    }
 }
