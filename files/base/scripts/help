@@ -1,0 +1,74 @@
+#!/bin/bash
+
+
+black() { echo -e "\033[0;30m$1\033[0m"; }
+red() { echo -e "\033[0;31m$1\033[0m"; }
+green() { echo -e "\033[0;32m$1\033[0m"; }
+yellow() { echo -e "\033[1;33m$1\033[0m"; }
+blue() { echo -e "\033[0;34m$1\033[0m"; }
+magenta() { echo -e "\033[0;35m$1\033[0m"; }
+cyan() { echo -e "\033[0;36m$1\033[0m"; }
+white() { echo -e "\033[0m$1\033[0m"; }
+
+error() { echo "$(red ERROR): $1"; }
+warning() { echo "$(yellow WARNING): $1"; }
+note() { echo "$(magenta NOTE): $1"; }
+
+if [ "$#" -eq 0 ]; then
+    echo "$(green ./util) is simple script used to build and manage your OS project
+    $(note "util is meant to be run only in project root directory")"
+echo
+echo "subcommands:
+    $(blue info)        - show information about project
+    $(blue use) <lang>  - initializes environment for your language ($(red "needs internet connection"))
+    $(blue conf) <arch> - configures the environment and finds needed tools
+    $(blue reconf)      - reconfigures the project (using different tools, ...)
+    $(blue build)       - builds the OS
+    $(blue run)         - runs the OS in emulator
+    $(blue dep)         - install build and run dependencies ($(red "needs internet connection"))
+    $(blue change)      - allows you to change project info
+    $(blue explain)     - answers your question"
+echo
+echo "$(magenta NOTE ): for more info use ./util help <subcommands>
+    for example: $(green "./util help build run") will show information about the $(green build) and $(green run) subcommand)"
+else
+    CMD="$*"
+fi
+
+IFS=' '
+
+
+for i in $CMD; do
+    case $i in 
+        
+        info)
+            echo "$(green ./util) $(blue info)"
+            echo "  $(yellow 'prints information about your OS project')"
+            echo "  $(green "./util info") $(blue os) prints information about OS"
+            echo "  $(green "./util info") $(blue kernel) prints information about kernel"
+        ;;
+        use)
+            echo "$(green ./util) $(blue use)"
+            echo "  $(yellow 'lets you choose programming language')"
+            echo -n "  "; note "internet connection is needed to download version of BaseOS for your language of choice"
+            echo
+            echo "  valid languages: $(green C), $(green rust)"
+        ;;
+        conf)
+            echo "$(green ./util) $(blue conf)"
+            echo "  $(yellow 'configures your project')"
+            echo "  configures CPU architecture and tools"
+            echo "  supported CPU architectures: $(green x86_64), $(red arm64)"
+            echo
+            echo "  usage: $(green ./util conf x86_64)"
+        ;;
+
+        *)
+            if [ "$1" != $i ]; then
+                error "unknown command '$i'"
+                exit 1
+            fi
+        ;;
+    esac
+    echo;
+done

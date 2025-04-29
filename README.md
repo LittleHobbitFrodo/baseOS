@@ -1,3 +1,3 @@
-# BaseOS `rust`
+# BaseOS `base`
 
-This version/branch is made for the rust programming language.
+This branch is the base of all BaseOS versions. It is merged into other branches to keep their base updated.
