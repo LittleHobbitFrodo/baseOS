@@ -2,4 +2,4 @@ baseOS.bin
 baseOS.iso
 .idea/
 iso
-
+.cache
