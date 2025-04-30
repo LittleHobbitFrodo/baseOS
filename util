@@ -247,7 +247,6 @@ function compile_c() {
 function compile_rust() {
 	cd $path
 
-	echo arch: $os_arch
 	output="$(cargo build --release --target-dir bin --verbose --target $os_arch-unknown-none)"
 	if [ "$?" != 0 ]; then
 	error "failed to build kernel"
