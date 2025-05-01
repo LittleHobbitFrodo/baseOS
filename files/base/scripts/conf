@@ -1,0 +1,178 @@
+#!/bin/bash
+
+black() { echo -e "\033[0;30m$1\033[0m"; }
+red() { echo -e "\033[0;31m$1\033[0m"; }
+green() { echo -e "\033[0;32m$1\033[0m"; }
+yellow() { echo -e "\033[1;33m$1\033[0m"; }
+blue() { echo -e "\033[0;34m$1\033[0m"; }
+magenta() { echo -e "\033[0;35m$1\033[0m"; }
+cyan() { echo -e "\033[0;36m$1\033[0m"; }
+white() { echo -e "\033[0m$1\033[0m"; }
+
+error() { echo "$(red ERROR): $1"; }
+warning() { echo "$(yellow WARNING): $1"; }
+note() { echo "$(magenta NOTE): $1"; }
+
+if [ $# -eq 0 ]; then
+    error "$(blue conf): expected at least 2 parameters: $(yellow architecture) and $(yellow language)"
+    exit 1
+fi
+
+CONFIG_PATH=$PWD/config/
+KERNEL_CONFIG=$CONFIG_PATH/kernel.conf
+OS_CONFIG=$CONFIG_PATH/os.conf
+UTIL_CONFIG=$CONFIG_PATH/util.conf
+SCRIPTS=$PWD/files/base/scripts
+
+baseos_url="https://github.com/LittleHobbitFrodo/baseOS.git"
+
+source $UTIL_CONFIG
+
+if [ "$configured" == true ]; then
+    error "project is already configured"
+    exit 2
+fi
+
+
+function get_arch() {
+    case $i in
+        x86_64)
+            echo x86_64
+        ;;
+        arm64)
+            echo aarch64
+        ;;
+    esac
+}
+
+
+arch=()
+lang=""
+main_file=NONE
+iso_name="BaseOS.iso"
+compiler=NONE
+
+
+#   resolve lang and arch
+for arg in "$@"; do
+    i="$(echo $arg | tr '[:upper:]' '[:lower:]')"
+    case $i in
+        c)
+            if [ -z "$lang" ]; then
+                lang="$i"
+            else
+                error "only one language is supported"
+                exit 1
+            fi
+        ;;
+        rust)
+            if [ -z "$lang" ]; then
+                lang="$i"
+            else
+                error "only one language is supported"
+                exit 1
+            fi
+        ;;
+        x86_64)
+            if [[ ! " ${arch[@]} " =~ " ${i} " ]]; then
+                arch+=("$i")
+            fi
+        ;;
+        arm64)
+            if [[ ! " ${arch[@]} " =~ " ${i} " ]]; then
+                arch+=("$i")
+            fi
+        ;;
+        *)
+            error "'$arg' is not valid architecture or language"
+            exit 1
+        ;;
+    esac
+done
+
+
+IFS=":"
+
+if [[ -z "$lang" || "${#arch[@]}" == 0 ]]; then
+    if [ -z "$lang" ]; then
+        error "no language specified"
+    else
+        error "no architecture specified"
+    fi
+    exit 1
+fi
+
+
+if [ "$lang" == c ]; then
+    main_file="kernel/src/init.c"
+else 
+
+    rustup=NONE
+    #   find cargo
+    for i in $PATH; do
+        if [ -e "$i/cargo" ]; then
+            compiler="$i/cargo"
+            note "found cargo: $(blue "$compiler")"
+        fi
+        if [ -e "$i/rustup" ]; then
+            rustup="$i/rustup"
+            note "found rustup: $(blue "$rustup")"
+        fi
+
+    done
+    if [ "$compiler" == NONE ]; then
+        error "could not find rust compiler (cargo), please install it"
+    fi
+    if [ "$rustup" == NONE ]; then
+        error "could not find rustup, please install it"
+    fi
+
+
+    #   install rust targets
+    IFS=" "
+    for i in "${arch[@]}"; do 
+        $rustup target add "$(get_arch $i)-unknown-none"
+        if [ "$?" != 0 ]; then error "failed to install rust target $(get_arch $i)-unknown-none"; exit 2; fi
+    done
+    note "rust setup completed"
+fi
+
+
+echo "#  this is util config file, please do not change manually" > $UTIL_CONFIG
+echo "configured=true" >> $UTIL_CONFIG
+echo "lang=$lang" >> $UTIL_CONFIG
+echo "arch=\"${arch[@]}\"" >> $UTIL_CONFIG
+echo "compiler=$compiler" >> $UTIL_CONFIG
+echo "main_file=$main_file" >> $UTIL_CONFIG
+echo "iso_name=$iso_name" >> $UTIL_CONFIG
+
+note "configuration uploaded"
+
+case "$lang" in 
+    c)
+        git clone "$baseos_url" --branch C
+        if [ $# != 0 ]; then
+            error "failed to clone $(blue "git clone $baseos_url --branch C")"
+            exit 2
+        fi
+        cp -R ./baseOS-C/* ./
+        if [ $# != 0 ]; then
+            error "failed to copy C sources"
+            exit 2
+        fi
+    ;;
+    rust)
+        git clone "$baseos_url" --branch rust
+        if [ $# != 0 ]; then
+            error "failed to clone $(blue "git clone $baseos_url --branch rust")"
+            exit 2
+        fi
+        cp -R ./baseOS-rust/* ./
+        if [ $# != 0 ]; then
+            error "failed to copy rust sources"
+            exit 2
+        fi
+    ;;
+esac
+
+note "project configuration succeeded"

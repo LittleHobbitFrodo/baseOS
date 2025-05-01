@@ -15,7 +15,16 @@ note() { echo "$(magenta NOTE): $1"; }
 
 
 function report() {
-    echo "$(red "OPERATION FAILED"): $subcmd"
+    status="$?"
+    if [ -n "${subcmd+x}" ]; then
+        echo "$(red "OPERATION $subcmd FAILED")"
+        if [[ -e "$SCRIPTS/$subcmd" && "$status" == 1 ]]; then
+            $SCRIPTS/help $subcmd
+        fi
+    else
+        echo "$(red "COMMAND $BASH_COMMAND FAILED")"
+    fi
+    exit 1
 }
 
 set -eEuo pipefail
@@ -23,11 +32,11 @@ set -eEuo pipefail
 #   set function to call if anything fails
 trap report ERR
 
-CONFIG_PATH=./config/
+CONFIG_PATH=$PWD/config/
 KERNEL_CONFIG=$CONFIG_PATH/kernel.conf
 OS_CONFIG=$CONFIG_PATH/os.conf
 UTIL_CONFIG=$CONFIG_PATH/util.conf
-SCRIPT=./files/base/scripts
+SCRIPTS=$PWD/files/base/scripts
 
 source $KERNEL_CONFIG
 source $OS_CONFIG
@@ -36,25 +45,23 @@ source $UTIL_CONFIG
 
 
 
-
-
-
 #   SCRIPT ENTRY POINT
-
-if [ "$#" -eq 0 ]; then
+if [ "$#" -lt 1 ]; then
     error "no command given"
     echo
-    help
+    $SCRIPTS/help
     exit
 fi
 
 args="${@:2}"
 subcmd=$1
 
-if [ -e "$SCRIPT/$subcmd" ]; then
-    $SCRIPT/$subcmd $args
+
+if [ -e "$SCRIPTS/$subcmd" ]; then
+    $SCRIPTS/$subcmd $args
 else
     error "subcommand '$subcmd' does not exist"
+    $SCRIPTS/help
     exit 1
 fi
 

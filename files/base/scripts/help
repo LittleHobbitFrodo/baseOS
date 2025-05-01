@@ -19,18 +19,17 @@ if [ "$#" -eq 0 ]; then
     $(note "util is meant to be run only in project root directory")"
 echo
 echo "subcommands:
-    $(blue info)        - show information about project
-    $(blue use) <lang>  - initializes environment for your language ($(red "needs internet connection"))
-    $(blue conf) <arch> - configures the environment and finds needed tools
-    $(blue reconf)      - reconfigures the project (using different tools, ...)
-    $(blue build)       - builds the OS
-    $(blue run)         - runs the OS in emulator
-    $(blue dep)         - install build and run dependencies ($(red "needs internet connection"))
-    $(blue change)      - allows you to change project info
-    $(blue explain)     - answers your question"
+    $(blue info)                - show information about project
+    $(blue conf) <arch/lang>    - configures the environment and finds needed tools
+    $(blue reconf)              - reconfigures the project (using different tools, ...)
+    $(blue build)               - builds the OS
+    $(blue run)                 - runs the OS in emulator
+    $(blue dep)                 - installs the tools needed to build and run the operating system ($(red "needs internet connection"))
+    $(blue change)              - allows you to change project info
+    $(blue explain)             - answers your question"
 echo
 echo "$(magenta NOTE ): for more info use ./util help <subcommands>
-    for example: $(green "./util help build run") will show information about the $(green build) and $(green run) subcommand)"
+    for example: $(green "./util help build run") will show information about the $(blue build) and $(blue run) subcommand"
 else
     CMD="$*"
 fi
@@ -44,24 +43,66 @@ for i in $CMD; do
         info)
             echo "$(green ./util) $(blue info)"
             echo "  $(yellow 'prints information about your OS project')"
-            echo "  $(green "./util info") $(blue os) prints information about OS"
-            echo "  $(green "./util info") $(blue kernel) prints information about kernel"
-        ;;
-        use)
-            echo "$(green ./util) $(blue use)"
-            echo "  $(yellow 'lets you choose programming language')"
-            echo -n "  "; note "internet connection is needed to download version of BaseOS for your language of choice"
-            echo
-            echo "  valid languages: $(green C), $(green rust)"
+            echo "  $(green ./util) $(blue "info os") prints information about OS"
+            echo "  $(green ./util) $(blue "info kernel") prints information about kernel"
         ;;
         conf)
             echo "$(green ./util) $(blue conf)"
             echo "  $(yellow 'configures your project')"
-            echo "  configures CPU architecture and tools"
-            echo "  supported CPU architectures: $(green x86_64), $(red arm64)"
+            echo "  configures CPU architecture, programming language and tools"
             echo
-            echo "  usage: $(green ./util conf x86_64)"
+            echo "  supported CPU architectures: $(green x86_64), $(red arm64)"
+            echo "  supported programming languages: $(green C), $(green rust)"
+            echo
+            echo "  usage: $(green ./util) $(blue "conf x86_64 rust")"
         ;;
+        reconf)
+            echo "$(green ./util) $(blue reconf)"
+            echo "  $(yellow 'reconfigures the project if some tools have changed or are missing')"
+            #   TODO
+        ;;
+        build)
+            echo "$(green ./util) $(blue build)"
+            echo "  $(yellow 'builds your OS project')"
+            echo "  $(red 'if multiple architectures are selected, it also expects the <arch/s> parameter/s')"
+            echo "          for instance: $(green ./util) $(blue 'build x86_64 arm64')"
+            echo
+            echo "  append $(blue debug) for debug options:"
+            echo "          $(green ./util) $(blue "build debug") builds your operating system for debugging"
+            echo "  append $(blue run) to automatically run it in emulator"
+            echo "          $(green ./util) $(blue 'build run red debug') starts the emulator for debugging"
+        ;;
+        run)
+            echo "$(green ./util) $(blue run)"
+            echo "  $(yellow 'starts the last compiled operating system in the emulator')"
+            echo
+            echo "  append $(blue debug) to run with debug options"
+        ;;
+        dep)
+            echo "$(green ./util) $(blue dep)"
+            echo "  $(yellow 'installs the tools needed to build and run the operating system')"
+            echo "  $(red 'internet connection is needed')"
+            echo
+            echo "  supported platforms:"
+            echo "      $(red Fedora Linux), $(red Arch Linux), $(red Ubuntu), $(red Debian) $(red CentOS)"
+            echo "      $(red MacOS) (brew), $(red FreeBSD), $(red OpenBSD)"
+        ;;
+        change)
+            echo "$(green ./util) $(blue change)"
+            echo "  $(yellow 'allows you to change project info')"
+            echo
+            echo "  available changes:"
+            echo "      $(yellow os) $(blue "name/version/release") changes OS name, version or release"
+            echo "      $(yellow kernel) $(blue "name/version/release") changes kernel name, version or release"
+        ;;
+        explain)
+            echo "$(green ./util) $(blue explain)"
+            echo "  $(yellow 'answers your question')"
+            echo
+            echo "  $(green ./util) $(blue 'explain project structure') will explain the BaseOS file structure"
+        ;;
+
+
 
         *)
             if [ "$1" != $i ]; then

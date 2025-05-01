@@ -2,3 +2,6 @@ iso
 kernel
 .cache
 .idea
+.rustc_info.json
+baseOS.bin
+baseOS.iso
