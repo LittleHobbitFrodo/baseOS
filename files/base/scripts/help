@@ -1,18 +1,6 @@
 #!/bin/bash
 
-
-black() { echo -e "\033[0;30m$1\033[0m"; }
-red() { echo -e "\033[0;31m$1\033[0m"; }
-green() { echo -e "\033[0;32m$1\033[0m"; }
-yellow() { echo -e "\033[1;33m$1\033[0m"; }
-blue() { echo -e "\033[0;34m$1\033[0m"; }
-magenta() { echo -e "\033[0;35m$1\033[0m"; }
-cyan() { echo -e "\033[0;36m$1\033[0m"; }
-white() { echo -e "\033[0m$1\033[0m"; }
-
-error() { echo "$(red ERROR): $1"; }
-warning() { echo "$(yellow WARNING): $1"; }
-note() { echo "$(magenta NOTE): $1"; }
+source "$PWD/files/base/scripts.conf"
 
 if [ "$#" -eq 0 ]; then
     echo "$(green ./util) is simple script used to build and manage your OS project
@@ -22,7 +10,7 @@ echo "subcommands:
     $(blue info)                - show information about project
     $(blue conf) <arch/lang>    - configures the environment and finds needed tools ($(red "needs internet connection"))
     $(blue reconf)              - reconfigures the project (using different tools, ...)
-    $(red build)               - builds the OS
+    $(blue build)               - builds the OS
     $(blue run)                 - runs the OS in emulator
     $(blue dep)                 - installs or removes the tools needed to build and run the operating system ($(red "needs internet connection"))
     $(blue change)              - allows you to change project info
@@ -61,7 +49,6 @@ for i in $CMD; do
         reconf)
             echo "$(green ./util) $(blue reconf)"
             echo "  $(yellow 'reconfigures the project if some tools have changed or are missing')"
-            #   TODO
         ;;
         build)
             echo "$(green ./util) $(blue build)"
@@ -105,6 +92,12 @@ for i in $CMD; do
             echo "  available changes:"
             echo "      $(yellow os) $(blue "name/version/release") changes OS name, version or release"
             echo "      $(yellow kernel) $(blue "name/version/release") changes kernel name, version or release"
+        ;;
+        mkiso)
+            echo "$(green ./util) $(blue mkiso)"
+            echo "  $(yellow builds you a bootable ISO) ($(red "the OS kernel must be built"))"
+            echo 
+            echo "  usage: $(green ./util) $(blue "mkiso <arch/s>")"
         ;;
         *)
             if [ "$1" != $i ]; then

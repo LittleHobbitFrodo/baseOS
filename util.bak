@@ -276,7 +276,6 @@ function compile_asm() {
     	local bname="$(basename $i)"
     	local bname="${bname/.asm/.o}"
 
-
     	if [ "$debug" == 0 ]; then
     		output="$($asm_compiler -f elf64 -o "./tmp/kernel/$bname" $i)"
     	else

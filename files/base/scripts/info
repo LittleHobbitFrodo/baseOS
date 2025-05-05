@@ -1,24 +1,7 @@
 #!/bin/bash
 
 
-black() { echo -e "\033[0;30m$1\033[0m"; }
-red() { echo -e "\033[0;31m$1\033[0m"; }
-green() { echo -e "\033[0;32m$1\033[0m"; }
-yellow() { echo -e "\033[1;33m$1\033[0m"; }
-blue() { echo -e "\033[0;34m$1\033[0m"; }
-magenta() { echo -e "\033[0;35m$1\033[0m"; }
-cyan() { echo -e "\033[0;36m$1\033[0m"; }
-white() { echo -e "\033[0m$1\033[0m"; }
-
-error() { echo "$(red ERROR): $1"; }
-warning() { echo "$(yellow WARNING): $1"; }
-note() { echo "$(magenta NOTE): $1"; }
-
-CONFIG_PATH=$PWD/config/
-KERNEL_CONFIG=$CONFIG_PATH/kernel.conf
-OS_CONFIG=$CONFIG_PATH/os.conf
-UTIL_CONFIG=$CONFIG_PATH/util.conf
-SCRIPTS=$PWD/files/base/scripts
+source "$PWD/files/base/scripts.conf"
 
 function print_arch() {
     if [ $printed_arch != false ]; then
@@ -96,15 +79,6 @@ for i in $options; do
                     #done
                 ;;
             esac
-
-            #lines=0
-            #case $lang in
-                #rust)
-                    #lines=$(find ../rust/kernel/ -path ../rust/kernel/bin -prune -o -type f -exec wc -l {} + | tail --lines 1)
-                #;;
-            #esac
-            #lines=$(echo $lines| awk '{print $1}')
-            #echo -e "$(blue code):\t$lines lines"
         ;;
     esac
     echo

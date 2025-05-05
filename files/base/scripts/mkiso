@@ -1,23 +1,6 @@
 #!/bin/bash
 
-black() { echo -e "\033[0;30m$1\033[0m"; }
-red() { echo -e "\033[0;31m$1\033[0m"; }
-green() { echo -e "\033[0;32m$1\033[0m"; }
-yellow() { echo -e "\033[1;33m$1\033[0m"; }
-blue() { echo -e "\033[0;34m$1\033[0m"; }
-magenta() { echo -e "\033[0;35m$1\033[0m"; }
-cyan() { echo -e "\033[0;36m$1\033[0m"; }
-white() { echo -e "\033[0m$1\033[0m"; }
-
-error() { echo "$(red ERROR): $1"; }
-warning() { echo "$(yellow WARNING): $1"; }
-note() { echo "$(magenta NOTE): $1"; }
-
-CONFIG_PATH=$PWD/config/
-KERNEL_CONFIG=$CONFIG_PATH/kernel.conf
-OS_CONFIG=$CONFIG_PATH/os.conf
-UTIL_CONFIG=$CONFIG_PATH/util.conf
-SCRIPTS=$PWD/files/base/scripts
+source "$PWD/files/base/scripts.conf"
 
 limine="$PWD/bootloader/limine/limine-$(uname)-$(uname -m)"
 limine_path="$PWD/bootloader"
@@ -31,40 +14,9 @@ function failure() {
     exit 1
 }
 
-function get_arch() {
-    case $a in
-        x86_64)
-            echo x86_64
-        ;;
-        arm64)
-            echo aarch64
-        ;;
-    esac
-}
-
-function kernel_full() {
-    echo "$kernel_path/$kernel_name-$(get_arch $1).bin"
-}
-function image_full() {
-    echo "$image_path/$iso_name-$(get_arch $1).iso"
-}
 
 set -eEuo pipefail
 trap failure ERR
-
-#   store kernel info
-source $KERNEL_CONFIG
-kernel_name=$name
-kernel_version=$version
-kernel_release=$release
-
-#   store OS info
-source $OS_CONFIG
-os_name=$name
-os_version=$version
-os_release=$release
-
-source $UTIL_CONFIG
 
 archs=""
 debug=false
