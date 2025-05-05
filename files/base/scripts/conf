@@ -97,7 +97,7 @@ if [[ ! -e "$PWD/kernel" && "$download" == true ]]; then
                 error "failed to clone $(blue "git clone $baseos_url --branch rust")"
                 exit 2
             fi
-            cp -R ./baseOS-rust/* ./
+            cp -R ./baseOS/kernel ./baseOS/files ./
             if [ $# != 0 ]; then
                 error "failed to copy rust sources"
                 exit 2
