@@ -2,7 +2,6 @@
 
 source "$PWD/files/base/scripts.conf"
 
-limine="$PWD/bootloader/limine/limine-$(uname)-$(uname -m)"
 limine_path="$PWD/bootloader"
 iso="$PWD/iso"
 kernel_path="$PWD/files"
@@ -42,7 +41,7 @@ fi
 
 IFS=" "
 for a in $archs; do
-    echo a: $a
+    limine="$PWD/bootloader/limine/limine-$(uname)-$(uname -m)"
 
     note "creating ISO for $a target"
 
@@ -64,7 +63,6 @@ for a in $archs; do
         limine_config="$limine_path/configs/limine.conf"
     fi
 
-    echo "limine cfg: $limine_config"
 
     cp $limine_config $limine_path/limine-bios.sys $iso/boot/limine
 
