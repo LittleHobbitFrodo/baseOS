@@ -1,0 +1,130 @@
+#!/bin/bash
+
+black() { echo -e "\033[0;30m$1\033[0m"; }
+red() { echo -e "\033[0;31m$1\033[0m"; }
+green() { echo -e "\033[0;32m$1\033[0m"; }
+yellow() { echo -e "\033[1;33m$1\033[0m"; }
+blue() { echo -e "\033[0;34m$1\033[0m"; }
+magenta() { echo -e "\033[0;35m$1\033[0m"; }
+cyan() { echo -e "\033[0;36m$1\033[0m"; }
+white() { echo -e "\033[0m$1\033[0m"; }
+
+error() { echo "$(red ERROR): $1"; }
+warning() { echo "$(yellow WARNING): $1"; }
+note() { echo "$(magenta NOTE): $1"; }
+
+
+CONFIG_PATH=$PWD/config/
+KERNEL_CONFIG=$CONFIG_PATH/kernel.conf
+OS_CONFIG=$CONFIG_PATH/os.conf
+UTIL_CONFIG=$CONFIG_PATH/util.conf
+SCRIPTS=$PWD/files/base/scripts
+$image_path="$PWD/files"
+kernel_path="$PWD/files"
+
+
+function kernel_full() {
+    echo "$kernel_path/$kernel_name-$(get_arch $1).bin"
+}
+function image_full() {
+    echo "$image_path/$iso_name-$(get_arch $1).iso"
+}
+
+function get_arch() {
+    case $1 in
+        x86_64)
+            echo x86_64
+        ;;
+        arm64)
+            echo aarch64
+        ;;
+    esac
+}
+
+
+#   store kernel info
+source $KERNEL_CONFIG
+kernel_name=$name
+kernel_version=$version
+kernel_release=$release
+
+#   store OS info
+source $OS_CONFIG
+os_name=$name
+os_version=$version
+os_release=$release
+
+source $UTIL_CONFIG
+
+archs=""
+debug=false
+if [ "$#" != 0 ]; then
+    for arg in "$@"; do
+        a="$(echo $arg | tr '[:upper:]' '[:lower:]')"
+        case $a in
+            debug)
+                debug=true
+            ;;
+            x86_64)
+                archs="$archs x86_64"
+            ;;
+            arm64)
+                archs="$archs aarch64"
+            ;;
+        esac
+    done
+else
+    archs="$arch"
+fi
+
+cargo_params="--target-dir bin --verbose --target"
+
+IFS=" "
+for a in $archs; do
+
+    note "building kernel for $a target"
+
+    if [ ! -e ./tmp/kernel ]; then
+        mkdir -p ./tmp/kernel
+    fi
+
+    if [ -e "$CONFIG_PATH/util-$a.conf" ]; then
+        source $CONFIG_PATH/util-$a.conf
+    else
+        error "configuration for $a target is missing"
+        exit 2
+    fi
+    
+
+
+
+    #   compile rust code
+
+    cd ./kernel
+        if [ "$debug" == true ]; then
+            $compiler build $cargo_params "$(get_arch $a)-unknown-none"
+        else
+            $compiler build --release $cargo_params "$(get_arch $a)-unknown-none"
+        fi
+
+        if [ "$?" != 0 ]; then
+            error "failed to compile kernel"
+            exit 2
+        fi
+
+    cd ..
+
+    cp $PWD/kernel/bin/$(get_arch $a)-unknown-none/release/baseOS ./tmp/kernel/kernel.o
+
+
+    #   link kernel
+    #find "./tmp/kernel" -name "*.o" -print0 | xargs -0 $linker -m "elf_$(get_arch $a)" -nostdlib -static --no-dynamic-linker -z text -z max-page-size=0x1000 -T "$PWD/kernel/linker.ld" -o $(kernel_full $a)
+    #if [ "$?" != 0 ]; then
+    #    error "failed to link kernel"
+    #    exit 2
+    #fi
+    cp ./tmp/kernel/kernel.o $(kernel_full $a)
+    
+    rm -rf ./tmp/*
+
+done

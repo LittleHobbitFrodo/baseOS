@@ -1,3 +1,0 @@
-os_release=baseOS-0.0.0.1
-os_name=baseOS
-os_version=0.0.1
