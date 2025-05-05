@@ -81,29 +81,24 @@ if [[ ! -e "$PWD/kernel" && "$download" == true ]]; then
     case "$lang" in 
         c)
             git clone "$baseos_url" --branch C
-            if [ $# != 0 ]; then
+            if [ "$#" != 0 ]; then
                 error "failed to clone $(blue "git clone $baseos_url --branch C")"
-                exit 2
-            fi
-            cp -R ./baseOS-C/* ./
-            if [ $# != 0 ]; then
-                error "failed to copy C sources"
                 exit 2
             fi
         ;;
         rust)
             git clone "$baseos_url" --branch rust
-            if [ $# != 0 ]; then
+            if [ "$?" != 0 ]; then
                 error "failed to clone $(blue "git clone $baseos_url --branch rust")"
-                exit 2
-            fi
-            cp -R ./baseOS/kernel ./baseOS/files ./
-            if [ $# != 0 ]; then
-                error "failed to copy rust sources"
                 exit 2
             fi
         ;;
     esac
+    cp -R ./baseOS/kernel ./baseOS/files ./
+    if [ "$?" != 0 ]; then
+        error "failed to copy rust sources"
+        exit 2
+    fi
 else
     if [ "$download" == false ]; then
         note "BaseOS $lang branch downloading was disabled"
