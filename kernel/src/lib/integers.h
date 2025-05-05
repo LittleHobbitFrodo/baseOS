@@ -36,7 +36,8 @@ typedef u64 qword;
 #define false 0
 #define NULL (void*)0
 
-typedef u8 bool;
+//typedef u8 bool;
+#define bool u8
 
 
 //	MAX and MIN

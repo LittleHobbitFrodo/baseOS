@@ -1,0 +1,96 @@
+#!/bin/bash
+
+source "$PWD/files/base/scripts.conf"
+
+archs=""
+debug=false
+if [ "$#" != 0 ]; then
+    for arg in "$@"; do
+        a="$(echo $arg | tr '[:upper:]' '[:lower:]')"
+        case $a in
+            debug)
+                debug=true
+            ;;
+            x86_64)
+                archs="$archs x86_64"
+            ;;
+            arm64)
+                archs="$archs aarch64"
+            ;;
+        esac
+    done
+else
+    archs="$arch"
+fi
+
+IFS=" "
+for a in $archs; do
+
+    note "building kernel for $a target"
+
+    if [ ! -e $PWD/tmp/kernel ]; then
+        mkdir -p $PWD/tmp/kernel
+    fi
+
+    if [ -e "$(arch_config $a)" ]; then
+        source $(arch_config $a)
+    else
+        error "configuration for $a target is missing"
+        exit 2
+    fi
+
+    case $a in
+        x86_64)
+
+            find "$PWD/kernel/" -name "*.asm" | while IFS= read -r i ; do
+                echo i: $i
+    	        bname="$(basename $i)"
+    	        bname="${bname/.asm/.o}"
+
+    	        #if [ "$debug" == 0 ]; then
+    		        nasm -f elf64 -o "./tmp/kernel/$bname" $i
+    	        #else
+			    #    nasm -f elf64 -g dwarf -o "./tmp/kernel/$bname" $i
+    	        #fi
+    	        if [ "$?" != 0 ]; then
+    		        error "file $i failed to compile"
+    		        exit 2
+    	        fi
+            done
+
+            compiler_params=("-I$PWD/kernel/" "-ffreestanding" "-fPIE" "-nostdlib" "-nostartfiles" "-mgeneral-regs-only"
+	        "-march=x86-64" "-Wall" "-Wextra" "-DKERNEL_NAME=$kernel_name" "-DKERNEL_VERSION=$kernel_version"
+	        "-DOS_NAME=$os_name" "-DOS_VERSION=$os_version" "-DOS_RELEASE=$os_release" "-fno-exceptions" "-m64" "-c")
+
+            if [ "$debug" == false ]; then
+                additional_params=("-finline-functions" "-O3" "-llibrary")
+            else
+                additional_params=("-fno-inline" "-g" "-O1" "-fno-omit-frame-pointer" "-DKERNEL_DEBUG")
+            fi
+        ;;
+        *)
+            error "target $a is not supported"
+            exit 2
+        ;;
+    esac
+    echo main file: $main_file
+
+    $compiler "${compiler_params[@]}" "${additional_params[@]}" "$main_file" -o $PWD/tmp/kernel/kernel.o
+
+    if [ "$?" != 0 ]; then
+        error "failed to compile kernel"
+        exit 2
+    fi
+
+
+    #   link kernel
+    find "$PWD/tmp/kernel/" -name "*.o" -print0 | xargs -0 $linker -m "elf_$(get_arch $a)" -nostdlib -static --no-dynamic-linker -z text -z max-page-size=0x1000 -T "$PWD/kernel/linker.ld" -o $(kernel_full $a)
+    if [ "$?" != 0 ]; then
+        error "failed to link kernel"
+        exit 2
+    fi
+
+    rm -rf ./tmp/*
+
+
+done
