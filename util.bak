@@ -595,7 +595,7 @@ function run() {
 		qemu-system-x86_64 -s -S -drive file=$image,if=virtio,media=disk,discard=unmap $emulator_params &
 		gdb -ex "target remote tcp:1234" $image
 	else
-		qemu-system-x86_64 -drive file=$image,if=virtio,media=disk,discard=unmap $emulator_params -D io.log -d out_asm
+		qemu-system-x86_64 -drive file=$image,if=virtio,media=disk,discard=unmap $emulator_params
 	fi
 	if [ "$?" != 0 ]; then error "emulation failed"; return 1; fi
 }

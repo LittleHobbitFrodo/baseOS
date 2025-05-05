@@ -26,11 +26,13 @@ SCRIPTS=$PWD/files/base/scripts
 
 baseos_url="https://github.com/LittleHobbitFrodo/baseOS.git"
 
-source $UTIL_CONFIG
+if [ -e "$UTIL_CONFIG" ]; then
+    source $UTIL_CONFIG
 
-if [ "$configured" == true ]; then
-    error "project is already configured"
-    exit 2
+    if [ "$configured" == true ]; then
+        error "project is already configured"
+        exit 2
+    fi
 fi
 
 
@@ -45,12 +47,34 @@ function get_arch() {
     esac
 }
 
+function arch_config() {
+    echo "$CONFIG_PATH/util-$i.conf"
+}
+
+function search_path() {
+    local old_ifs="$IFS"
+    IFS=":"
+    for i in $PATH; do
+        if [ -e "$i/$1" ]; then
+            IFS="$old_ifs"
+            echo "$i/$1"
+            return
+        fi
+    done
+    IFS="$old_ifs"
+    echo NONE
+}
+
+
+
 
 arch=()
 lang=""
 main_file=NONE
-iso_name="BaseOS.iso"
-compiler=NONE
+iso_name=BaseOS     #   -<arch>.iso will be added by the build subcommand
+    #   iso files are located in the ./files directory
+all_tools_installed=true
+donwload=true
 
 
 #   resolve lang and arch
@@ -83,6 +107,9 @@ for arg in "$@"; do
                 arch+=("$i")
             fi
         ;;
+        "-no-download")
+            download=false
+        ;;
         *)
             error "'$arg' is not valid architecture or language"
             exit 1
@@ -90,89 +117,109 @@ for arg in "$@"; do
     esac
 done
 
+if [[ ! -e "$PWD/kernel" && "$download" == true ]]; then
 
-IFS=":"
-
-if [[ -z "$lang" || "${#arch[@]}" == 0 ]]; then
-    if [ -z "$lang" ]; then
-        error "no language specified"
+    note "downloading BaseOS $lang branch"
+    case "$lang" in 
+        c)
+            git clone "$baseos_url" --branch C
+            if [ $# != 0 ]; then
+                error "failed to clone $(blue "git clone $baseos_url --branch C")"
+                exit 2
+            fi
+            cp -R ./baseOS-C/* ./
+            if [ $# != 0 ]; then
+                error "failed to copy C sources"
+                exit 2
+            fi
+        ;;
+        rust)
+            git clone "$baseos_url" --branch rust
+            if [ $# != 0 ]; then
+                error "failed to clone $(blue "git clone $baseos_url --branch rust")"
+                exit 2
+            fi
+            cp -R ./baseOS-rust/* ./
+            if [ $# != 0 ]; then
+                error "failed to copy rust sources"
+                exit 2
+            fi
+        ;;
+    esac
+else
+    if [ "$download" == false ]; then
+        note "BaseOS $lang branch downloading was disabled"
     else
-        error "no architecture specified"
+        note "looks like BaseOS $lang branch is already downloaded"
     fi
-    exit 1
 fi
 
 
-if [ "$lang" == c ]; then
-    main_file="kernel/src/init.c"
-else 
 
-    rustup=NONE
-    #   find cargo
-    for i in $PATH; do
-        if [ -e "$i/cargo" ]; then
-            compiler="$i/cargo"
-            note "found cargo: $(blue "$compiler")"
-        fi
-        if [ -e "$i/rustup" ]; then
-            rustup="$i/rustup"
-            note "found rustup: $(blue "$rustup")"
-        fi
+note "creating utility configuration"
 
-    done
-    if [ "$compiler" == NONE ]; then
-        error "could not find rust compiler (cargo), please install it"
-    fi
-    if [ "$rustup" == NONE ]; then
-        error "could not find rustup, please install it"
-    fi
-
-
-    #   install rust targets
-    IFS=" "
-    for i in "${arch[@]}"; do 
-        $rustup target add "$(get_arch $i)-unknown-none"
-        if [ "$?" != 0 ]; then error "failed to install rust target $(get_arch $i)-unknown-none"; exit 2; fi
-    done
-    note "rust setup completed"
-fi
-
-
-echo "#  this is util config file, please do not change manually" > $UTIL_CONFIG
+echo "# This is util configuration, please do not change manually" > $UTIL_CONFIG
 echo "configured=true" >> $UTIL_CONFIG
-echo "lang=$lang" >> $UTIL_CONFIG
+echo "xorriso=$(search_path xorriso)" >> $UTIL_CONFIG
 echo "arch=\"${arch[@]}\"" >> $UTIL_CONFIG
-echo "compiler=$compiler" >> $UTIL_CONFIG
-echo "main_file=$main_file" >> $UTIL_CONFIG
+echo "lang=$lang" >> $UTIL_CONFIG
 echo "iso_name=$iso_name" >> $UTIL_CONFIG
 
-note "configuration uploaded"
 
-case "$lang" in 
-    c)
-        git clone "$baseos_url" --branch C
-        if [ $# != 0 ]; then
-            error "failed to clone $(blue "git clone $baseos_url --branch C")"
-            exit 2
-        fi
-        cp -R ./baseOS-C/* ./
-        if [ $# != 0 ]; then
-            error "failed to copy C sources"
-            exit 2
-        fi
-    ;;
-    rust)
-        git clone "$baseos_url" --branch rust
-        if [ $# != 0 ]; then
-            error "failed to clone $(blue "git clone $baseos_url --branch rust")"
-            exit 2
-        fi
-        cp -R ./baseOS-rust/* ./
-        if [ $# != 0 ]; then
-            error "failed to copy rust sources"
-            exit 2
-        fi
-    ;;
-esac
+c_compiler_midnames="-elf- -linux-gnu-"       #   without the last -
+IFS=" "
+for i in "${arch[@]}"; do
+    compiler=NONE
+    linker=NONE
+    #   check the compiler
+    case "$lang" in
+        c)
+            for cc in $c_compiler_midnames; do
+                if [ $compiler == NONE ]; then
+                    compiler="$(search_path "$(get_arch $i)$cc$(echo gcc)")"
+                fi
+                if [ $linker == NONE ]; then
+                    linker="$(search_path "$(get_arch $i)$cc$(echo ld)")"
+                fi
+                if [[ "$compiler" != NONE && "$linker" != NONE ]]; then
+                    break
+                fi
+            done
+        ;;
+        rust)
+            compiler="$(search_path cargo)"
+            linker="$(search_path "$(get_arch $i)-elf-ld")"
+        ;;
+    esac
+    qemu="$(search_path "qemu-system-$(get_arch $i)")"
 
-note "project configuration succeeded"
+    config_file="$(arch_config $i)"
+
+    if [ "$compiler" == NONE ]; then
+        warning "compiler for the $i target is missing"
+        all_tools_installed=false
+    fi
+
+    if [ "$linker" == NONE ]; then
+        warning "linker for the $i target is missing"
+        all_tools_installed=false
+    fi
+
+    if [ "$qemu" == NONE ]; then
+        warning "emulator fot the $i target is missong"
+        all_tools_installed=false
+    fi
+
+    note "creating configuration for the $i target"
+
+    #   flush the config
+    echo "# This is util $i target configuration, please do not edit manually" > $config_file
+    echo "compiler=$compiler" >> $config_file
+    echo "linker=$linker" >> $config_file
+    echo "emulator=$qemu" >> $config_file
+
+done
+
+if [ "$all_tools_installed" != true ]; then
+    warning "some development dependencies are missing, try running $(green "./util dep install") and then $(green "./util reconf")"
+fi

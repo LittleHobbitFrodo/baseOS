@@ -38,10 +38,6 @@ OS_CONFIG=$CONFIG_PATH/os.conf
 UTIL_CONFIG=$CONFIG_PATH/util.conf
 SCRIPTS=$PWD/files/base/scripts
 
-source $KERNEL_CONFIG
-source $OS_CONFIG
-source $UTIL_CONFIG
-
 
 
 
@@ -50,7 +46,23 @@ if [ "$#" -lt 1 ]; then
     error "no command given"
     echo
     $SCRIPTS/help
-    exit
+    exit 1
+fi
+
+if [[ ! -e "$UTIL_CONFIG" && "$1" != conf ]]; then
+    error "The project is not configured"
+    echo
+    $SCRIPTS/help conf
+    exit 1
+fi
+
+source $UTIL_CONFIG
+
+if [ $configured != true ]; then
+    error "The project is not configured"
+    echo
+    $SCRIPTS/help conf
+    exit 1
 fi
 
 args="${@:2}"
