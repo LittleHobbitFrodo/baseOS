@@ -82,6 +82,7 @@ Please note that some development **dependencies** must be **built from source**
     - assembler for each architecture
     - specified as parameter for conf subcommand?
   - instead of using paths to linker, compiler etc, the path will be statisally pointing to symlinks pointing to the tools
+  - add compiler_parameters.conf
 ### C
 - [X] Bootable
 - [X] Renderer

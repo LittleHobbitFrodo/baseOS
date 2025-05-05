@@ -1,6 +1,5 @@
 #!/bin/bash
 
-SCRIPTS_CONF_DISABLE_CONFIGS=""
 
 source "$PWD/files/base/scripts.conf"
 
@@ -11,22 +10,25 @@ fi
 
 baseos_url="https://github.com/LittleHobbitFrodo/baseOS.git"
 
-if [ -e "$UTIL_CONFIG" ]; then
+#if [ -e "$UTIL_CONFIG" ]; then
 
-    if [ "$configured" == true ]; then
-        error "project is already configured"
-        exit 2
-    fi
-fi
+#    if [ "$configured" == true ]; then
+#        error "project is already configured"
+#        exit 2
+#    fi
+#fi
+
 
 
 arch=()
 lang=""
-main_file=NONE
 iso_name=BaseOS     #   -<arch>.iso will be added by the build subcommand
     #   iso files are located in the ./files directory
 all_tools_installed=true
-donwload=true
+download=true
+main_file=NONE
+
+
 
 
 #   resolve lang and arch
@@ -68,6 +70,10 @@ for arg in "$@"; do
         ;;
     esac
 done
+
+if [[ "$lang" == c && "$main_file" == NONE ]]; then
+    main_file="./kernel/src/init.c"
+fi
 
 if [[ ! -e "$PWD/kernel" && "$download" == true ]]; then
 
@@ -116,6 +122,7 @@ echo "xorriso=$(search_path xorriso)" >> $UTIL_CONFIG
 echo "arch=\"${arch[@]}\"" >> $UTIL_CONFIG
 echo "lang=$lang" >> $UTIL_CONFIG
 echo "iso_name=$iso_name" >> $UTIL_CONFIG
+echo "main_file=$main_file" >> $UTIL_CONFIG
 
 
 c_compiler_midnames="-elf- -linux-gnu-"       #   without the last -
@@ -171,6 +178,18 @@ for i in "${arch[@]}"; do
     echo "emulator=$qemu" >> $config_file
 
 done
+
+if [ ! -e $KERNEL_CONFIG ]; then
+    echo "name=BaseOS-kernel" > $KERNEL_CONFIG
+    echo "version=0.0.1" >> $KERNEL_CONFIG
+    echo "release=BaseOS-v0.0.1" >> $KERNEL_CONFIG
+fi
+
+if [ ! -e $OS_CONFIG ]; then
+    echo "name=BaseOS" > $OS_CONFIG
+    echo "version=0.0.1" >> $OS_CONFIG
+    echo "release=BaseOS-v0.0.1" >> $OS_CONFIG
+fi
 
 if [ "$all_tools_installed" != true ]; then
     warning "some development dependencies are missing, try running $(green "./util dep install") and then $(green "./util reconf")"

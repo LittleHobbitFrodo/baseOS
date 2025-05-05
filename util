@@ -30,20 +30,21 @@ if [ "$#" -lt 1 ]; then
     exit 1
 fi
 
-if [[ ! -e "$UTIL_CONFIG" && "$1" != conf ]]; then
-    error "The project is not configured"
-    echo
-    $SCRIPTS/help conf
-    exit 1
-fi
-
-source $UTIL_CONFIG
-
-if [ $configured != true ]; then
-    error "The project is not configured"
-    echo
-    $SCRIPTS/help conf
-    exit 1
+if [ "$1" != conf ]; then
+    if [ ! -e "$UTIL_CONFIG" ]; then
+        error "project is not configured"
+        echo
+        $SCRIPTS/help conf
+        exit 1
+    else
+        source $UTIL_CONFIG
+        if [ "$configured" != true ]; then
+            error "project is not configured"
+            echo
+            $SCRIPTS/help conf
+            exit 1
+        fi
+    fi
 fi
 
 args="${@:2}"
@@ -59,5 +60,5 @@ else
 fi
 
 if [ "$subcmd" == build ]; then
-    $SCRIPTS/mkimage
+    $SCRIPTS/mkiso
 fi
