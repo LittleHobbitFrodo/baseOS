@@ -11,5 +11,5 @@ rustflags = [
     "-C", "link-args=-nostdlib",
     "-C", "link-args=-static",
     "-C", "link-args=--no-dynamic-linker",
-    "-C", "link-args=-z text -z max-page-size=0x1000 -T /Users/sam/docs/prog/baseOS/kernel/linker.ld"
+    "-C", "link-args=-z text -z max-page-size=0x1000 -T linker.ld"
 ]
