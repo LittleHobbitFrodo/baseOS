@@ -20,12 +20,13 @@ if [ "$#" -eq 0 ]; then
 echo
 echo "subcommands:
     $(blue info)                - show information about project
-    $(blue conf) <arch/lang>    - configures the environment and finds needed tools
+    $(blue conf) <arch/lang>    - configures the environment and finds needed tools ($(red "needs internet connection"))
     $(blue reconf)              - reconfigures the project (using different tools, ...)
     $(red build)               - builds the OS
     $(blue run)                 - runs the OS in emulator
     $(blue dep)                 - installs or removes the tools needed to build and run the operating system ($(red "needs internet connection"))
-    $(blue change)              - allows you to change project info"
+    $(blue change)              - allows you to change project info
+    $(blue mkiso)               - creates bootable ISO for your OS"
 echo
 echo "$(magenta NOTE ): for more info use ./util help <subcommands>
     for example: $(green "./util help build run") will show information about the $(blue build) and $(blue run) subcommand"

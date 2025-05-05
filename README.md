@@ -73,6 +73,11 @@ Please note that some development **dependencies** must be **built from source**
   - [X] Running
   - [ ] Dependency management
   - [X] Project management
+  - [X] mkiso
+  
+- TODO
+  - when changing kernel name limine configs must be updated
+    - once done update mkiso to work with it
 ### C
 - [X] Bootable
 - [X] Renderer
