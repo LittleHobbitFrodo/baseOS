@@ -15,28 +15,30 @@
 /// otherwise it could break things
 //pub const ALLOC_ALIGN: usize = 4;
 
+
 pub use buddy_system_allocator as allocator;
 use spin::MutexGuard;
 use core::alloc::GlobalAlloc;
 pub use core::alloc::Layout;
 use core::mem::MaybeUninit;
 use core::ptr::{copy_nonoverlapping, drop_in_place, null_mut, NonNull};
-use crate::mem::Region;
+use crate::mem::*;
 use crate::spin::Mutex;
 use crate::Immutable;
 
 pub type LockedHeap = allocator::LockedHeap<32>;
 pub type Heap = allocator::Heap<32>;
-pub struct Allocator {
-    alloc: LockedHeap,
-    regions: Mutex<Region>,     //  TODO: use vector
-}
+
+/// The default Allocator type for BaseOS
+/// - has no members on purpose to prevent taking any memory with the use of `Global` allocator in other crates
+pub struct Allocator {}
+
 
 impl Allocator {
     pub(crate) const fn new() -> Self {
         Self {
-            alloc: allocator::LockedHeap::new(),
-            regions: Mutex::new(Region::empty()),
+            //alloc: allocator::LockedHeap::new(),
+            //regions: Mutex::new(Region::empty()),
         }
     }
 
@@ -46,14 +48,19 @@ impl Allocator {
     pub unsafe fn allocate<T: Sized>(&self, val: T) -> Result<NonNull<T>, ()> {
         let layout = Layout::new::<T>();
 
-        if let Ok(d) = self.alloc.lock().alloc(layout) {
-            let data = unsafe { NonNull::new_unchecked(d.as_ptr() as *mut T) };
-            unsafe { *data.as_ptr() = val };
-            
-            Ok(data)
-        } else {
-            Err(())
+        let data = unsafe { self.alloc(layout) as *mut T };
+
+        if data.is_null() {
+            return Err(());
         }
+
+
+        unsafe {
+            *data = val;
+        }
+
+        Ok(unsafe { NonNull::new_unchecked(data) })
+
     }
 
     /// allocates uninitialized data of type T with proper alignment
@@ -61,12 +68,21 @@ impl Allocator {
     #[inline]
     pub unsafe fn allocate_uninit<T: Sized>(&self) -> Result<NonNull<MaybeUninit<T>>, ()> {
         let layout = unsafe { Layout::from_size_align_unchecked(size_of::<T>(), align_of::<T>()) };
-        if let Ok(d) = self.alloc.lock().alloc(layout) {
+        
+        let data = unsafe { self.alloc(layout) as *mut MaybeUninit<T> };
+
+        if data.is_null() {
+            return Err(());
+        }
+
+        Ok(unsafe { NonNull::new_unchecked(data) })
+        
+        /*if let Ok(d) = self.alloc.lock().alloc(layout) {
             let data = unsafe { NonNull::new_unchecked(d.as_ptr() as *mut MaybeUninit<T>) };
             Ok(data)
         } else {
             Err(())
-        }
+        }*/
     }
 
     /// deallocate pointer from heap and run its `drop` if it is needed
@@ -86,14 +102,14 @@ impl Allocator {
 
     /// gets immutable reference to regions
     #[inline]
-    pub fn get_regions(&self) -> Immutable<MutexGuard<Region>> {
-        Immutable::new(self.regions.lock())
+    pub fn get_regions(&self) -> Immutable<MutexGuard<Region<PAGE_ALIGN>>> {
+        Immutable::new(REGIONS.lock())
     }
     
     /// try to obtain regions
     #[inline]
-    pub fn try_get_regions(&self) -> Option<Immutable<MutexGuard<Region>>> {
-        if let Some(guard) = self.regions.try_lock() {
+    pub fn try_get_regions(&self) -> Option<Immutable<MutexGuard<Region<PAGE_ALIGN>>>> {
+        if let Some(guard) = REGIONS.try_lock() {
             Some(Immutable::new(guard))
         } else {
             None
@@ -105,7 +121,7 @@ impl Allocator {
     #[inline(always)]
     pub unsafe fn add_to_heap(&self, start: usize, end: usize) {
         //  once using vector for regions: push
-        unsafe { self.alloc.lock().add_to_heap(start, end) };
+        unsafe { HEAP.lock().add_to_heap(start, end) };
     }
 
     #[inline(always)]
@@ -117,18 +133,18 @@ impl Allocator {
     /// returns the actual number of bytes in the heap
     #[inline(always)]
     pub fn total_bytes(&self) -> usize {
-        self.alloc.lock().stats_total_bytes()
+        HEAP.lock().stats_total_bytes()
     }
 
     /// returns the number of bytes that are allocated
     #[inline(always)]
     pub fn allocated_bytes(&self) -> usize {
-        self.alloc.lock().stats_alloc_actual()
+        HEAP.lock().stats_alloc_actual()
     }
 
     /// reallocates memory to an new layout
     pub unsafe fn realloc_layout(&self, old: *mut u8, old_l: Layout, new_l: Layout) -> *mut u8 {
-        let new = unsafe { self.alloc.alloc(new_l) };
+        let new = unsafe { self.alloc(new_l) };
 
         if new.is_null() {
             return core::ptr::null_mut();
@@ -149,21 +165,20 @@ impl Allocator {
 
 unsafe impl GlobalAlloc for Allocator {
 
-    /// allocates new data on the heap  
+    /// allocates new data on the heap
+    /// 
     /// if allocation fails:
     /// - runs the `out_of_memory_handler` routine (defined in main crate)
     ///   - success: try allocation again
     ///   - failure: returns null
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
 
-        crate::println!("ALLOC");
-
-        match self.alloc.lock().alloc(layout) {
+        match HEAP.lock().alloc(layout) {
             Ok(data) => data.as_ptr(),
             Err(_) => {
                 //  run out_of_memory routine and try again
                 
-                let mut alloc = self.alloc.lock();
+                let mut alloc = HEAP.lock();
                 if let Ok(_) = unsafe { out_of_memory_handler(&mut alloc, &self) }{
                     match alloc.alloc(layout) {
                         Ok(data) => data.as_ptr(),
@@ -179,33 +194,22 @@ unsafe impl GlobalAlloc for Allocator {
 
     /// same as `alloc` but zeroes the allocated buffer
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        match self.alloc.lock().alloc(layout) {
-            Ok(d) => {
-                unsafe { core::ptr::write_bytes(d.as_ptr() as *mut usize, 0, layout.size()/size_of::<usize>()) };
-                d.as_ptr()
-            },
-            Err(_) => {
-                //  run out_of_memory routine and try again
-                
-                let mut alloc = self.alloc.lock();
-                if let Ok(_) = unsafe { out_of_memory_handler(&mut alloc, &self) } {
-                    match alloc.alloc(layout) {
-                        Ok(d) => {
-                            unsafe { core::ptr::write_bytes(d.as_ptr() as *mut usize, 0, layout.size()/size_of::<usize>()) };
-                            d.as_ptr()
-                        }
-                        Err(_) => null_mut(),
-                    }
-                } else {
-                    null_mut()
-                }
-            },
+
+        let data = unsafe { self.alloc(layout) };
+
+        if data.is_null() {
+            null_mut()
+        } else {
+            unsafe {
+                core::ptr::write_bytes(data, 0, layout.size())
+            }
+            data
         }
     }
 
     #[inline]
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        self.alloc.lock().dealloc(unsafe { NonNull::new_unchecked(ptr) }, layout);
+        HEAP.lock().dealloc(unsafe { NonNull::new_unchecked(ptr) }, layout);
     }
 
     /// reallocates memory
@@ -213,10 +217,14 @@ unsafe impl GlobalAlloc for Allocator {
     /// 
     /// used layout: `Layout::from_size_unchecked(new_size, layout.align())`
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        let new = match self.alloc.lock().alloc(unsafe { Layout::from_size_align_unchecked(new_size, layout.align()) } ) {
-            Ok(data) => data.as_ptr(),
-            Err(_) => return null_mut(),
+        
+        let new = unsafe {
+            self.alloc(Layout::from_size_align_unchecked(new_size, layout.align()))
         };
+
+        if new.is_null() {
+            return null_mut();
+        }
 
         let count = core::cmp::min(new_size, layout.size());
         unsafe {
@@ -229,9 +237,16 @@ unsafe impl GlobalAlloc for Allocator {
 }
 
 
+/// This is the global allocator for BaseOS
+/// 
+/// It is used by all structures that are working with heap as the default allocator
 #[global_allocator]
 pub static ALLOCATOR: Allocator = Allocator::new();
-pub static REGIONS: Mutex<Region> = Mutex::new(Region::empty());
+
+/// This structure takes care of mapping all the memory regions of the heap
+pub(crate) static REGIONS: Mutex<Region<PAGE_ALIGN>> = Mutex::new(Region::empty());
+/// This is the Heap used by the `ALLOCATOR`
+pub(crate) static HEAP: LockedHeap = allocator::LockedHeap::new();
     // use Vec later
 
 
@@ -239,7 +254,7 @@ unsafe extern "Rust" {
 
     //  functions defined by the developer in the main crate
 
-     pub(crate) fn find_heap_region() -> Result<Region, ()>;
+     pub(crate) fn find_heap_region() -> Result<Region<PAGE_ALIGN>, Option<&'static str>>;
      pub(crate) fn out_of_memory_handler(heap: &mut MutexGuard<Heap>, allocator: &Allocator) -> Result<(), ()>;
 }
 
@@ -250,20 +265,23 @@ unsafe extern "Rust" {
 
 
 /// `init` initializes heap  
+/// 
 /// **IMPORTANT**
 /// - this function uses the [`mem::find_heap_region`] function from the main crate
 ///   - rewrite this function to change the default behaviour
 /// 
 /// You can check where the heap is with the [`ministd::mem::heap::REGION`] variable
 /// - please do not change it
-pub(crate) fn init() -> Result<(), ()> {
+pub(crate) fn init() -> Result<(), Option<&'static str>> {
 
-    if let Ok(reg) = unsafe { find_heap_region() } {
-        *REGIONS.lock() = reg;
-        let mut alloc = ALLOCATOR.alloc.lock();
-        unsafe { alloc.init(reg.start, reg.size); }
-        return Ok(());
-    }
-    Err(())
+    let reg = unsafe { find_heap_region() }?;
+
+    *REGIONS.lock() = reg;
+
+    let mut alloc = HEAP.lock();
+
+    unsafe { alloc.init(reg.virt() as usize, reg.size); }
+
+    Ok(())
 
 }

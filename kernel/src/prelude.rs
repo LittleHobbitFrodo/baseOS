@@ -2,7 +2,7 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
-//  this file is used as target in the util script
+//  this file is used as target by the util script
 
 #![no_std]
 #![no_main]

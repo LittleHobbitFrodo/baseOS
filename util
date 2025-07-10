@@ -87,6 +87,7 @@ for i in $args; do
             exit 1
         fi
 
+        
         if [ "$subcmd" == build ]; then
             $SCRIPTS/mkiso
         fi
@@ -94,36 +95,5 @@ for i in $args; do
 
     IFS="+"
 done
-
-# echo util: args: "${args[@]}"
-
-# IFS='+' read -ra parts <<< "${args[@]}"
-# echo "Original: ${args[@]}"
-# parts="${args[@]}"
-# for part in "${parts[@]}"; do
-
-#     #subcmd=$part
-#     subcmd="${part%% *}"
-#     #part="${part:1}"
-#     part="${part#* }"
-
-#     echo; echo
-#     echo subcmd: $subcmd
-#     echo part: $part
-#     continue
-
-#     if [ -e "$SCRIPTS/$subcmd" ]; then
-#         $SCRIPTS/$subcmd $part
-#     else
-#         error "subcommand '$subcmd' does not exist"
-#         $SCRIPTS/help
-#         exit 1
-#     fi
-
-#     if [ "$subcmd" == build ]; then
-#         $SCRIPTS/mkiso
-#     fi
-
-# done
 
 exit

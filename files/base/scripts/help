@@ -55,7 +55,7 @@ for i in $CMD; do
         ;;
         build)
             echo "$(green ./util) $(blue build)"
-            echo "  $(yellow 'builds your OS project')"
+            echo "  $(yellow 'builds your OS project') and constructs the ISO image structure"
             echo "  $(red 'if multiple architectures are selected, it also expects the <arch/s> parameter/s')"
             echo "          for instance: $(green ./util) $(blue 'build x86_64 arm64')"
             echo

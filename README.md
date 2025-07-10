@@ -15,7 +15,7 @@ This project is not intended to be an example of an operating system, only its f
 The whole project is under the **M.I.T.** license, which allows you to add code/files to the project under different licenses (even proprietary).
 
 # Tools
-Tools are available with the `util` tool. It performs project initialization and administration, builds the operating system and installs/removes development dependencies.
+Tools are available with the `util` tool. It performs project initialization and administration, builds the operating system, installs/removes development dependencies, etc..
 It also offers the `./util help` command to learn more.
 
 # Requirements
@@ -36,12 +36,13 @@ Please note that some development **dependencies** must be **built from source**
 - [ ] arm64
 
 # Supported Programming Languages
-- [X] Rust (60% of the work is done)
+- [X] Rust (75% of the work is done, testing is required)
 
 # Development Dependencies
 ### Rust
 - **rustup** (regardless of the target platform)
   - The `util` utility will install and set it up for you
+- **linker** - for example `x86_64-linux-gnu-ld`
 
 ### Other Required dependencies
 - **Xorriso** - builds the ISO
@@ -54,11 +55,13 @@ Please note that some development **dependencies** must be **built from source**
     - `git clone https://github.com/LittleHobbitFrodo/BaseOS.git`
 2. Choose your target platform and programming language
 3. Configuring the project using the `util` tool
-    - `./util conf <arch> <lang>`
-      - for example `./util conf x86_64 rust`
+    - `./util conf <arch>`
+      - for example `./util conf x86_64`
 4. You can also download development dependencies
     - `./util dep install`
     - dependencies can be removed using `./util dep remove`
+5. Build and run the OS
+    - `./util build + run`
 
 
 # Roadmap
@@ -75,19 +78,20 @@ Please note that some development **dependencies** must be **built from source**
 - [X] Bootable
 - [X] Renderer
 - [ ] STDlib
-  - [X] Bootloader communication
-    - limine-rs crate
+  - [X] Bootloader communication - limine-rs crate
   - [X] Text Rendering
     - [X] Output Formatting
   - [X] Sync primitives
     - used Spin crate
   - [X] Panicking
-  - [X] Heap
-    - buddy_system_allocator
+  - [X] Heap - buddy_system_allocator
   - [X] String (untested)
-  - [X] Box
-    - `Array` is used for allocation of arrays
+  - [X] Box - `Array` is used for allocation of arrays
   - [X] Vector
-  - [ ] HashMap
+  - [X] HashMap - using `hashbrown` from the std
   - [ ] Rc
   - [ ] Arc
+
+#### Maybes
+- STDlib
+  - [ ] BTreeMap

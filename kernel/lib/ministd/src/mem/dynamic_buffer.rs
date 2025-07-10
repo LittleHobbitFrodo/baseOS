@@ -8,6 +8,10 @@ use core::ptr::{NonNull, copy_nonoverlapping};
 use core::alloc::{Layout, GlobalAlloc};
 use crate::{ALLOCATOR, TryClone};
 
+//use allocator_api2::Allocator;
+
+
+
 
 /// returns the minimum of 3 values
 #[inline(always)]

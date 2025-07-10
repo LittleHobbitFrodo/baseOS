@@ -4,7 +4,6 @@
 
 #![no_std]
 #![no_main]
-//#![deny(static_mut_refs)]
 
 
 use core::ops::Deref;
@@ -16,6 +15,7 @@ use core::ops::Deref;
 
 
 pub use core::pin::Pin;
+//pub use core::intrinsics::{unlikely, likely};
 
 
 //  used modules
@@ -32,6 +32,7 @@ pub use mem::boxed::Box;
 pub use mem::vec::Vec;
 pub use mem::array::Array;
 pub use mem::alloc::{self, ALLOCATOR, Allocator};
+pub use mem::rc::Rc;
 
 //  local crates
 pub use bootloader;
@@ -104,5 +105,33 @@ impl<T: Sized> Deref for Immutable<T> {
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.data
+    }
+}
+
+
+pub static PANIC_FMT_MSG: RwLock<Option<&'static str>> = RwLock::new(None);
+
+/// Makes support for formatted panic messages possible
+#[macro_export]
+macro_rules! panic_fmt {
+    ($($arg:tt)*) => {{
+
+        use core::fmt::Write;
+
+        let mut msg: String = String::with_capacity(64);
+
+        if let Err(_) = write!(&mut msg, $($arg)*) {
+            panic!();
+        }
+
+        *$crate::PANIC_FMT_MSG.write() = Some(msg.leak());
+
+        panic!();
+        
+
+    }};
+
+    () => {
+        panic!();
     }
 }

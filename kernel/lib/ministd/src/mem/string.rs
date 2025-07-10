@@ -3,7 +3,7 @@
 //      on OS template on which to build
 
 use crate::mem::DynamicBuffer;
-use core::{array::IntoIter, fmt::{Debug, Display, Write}, mem::ManuallyDrop, ops::{Deref, DerefMut, Index, IndexMut, RangeBounds}, ptr::{self, copy_nonoverlapping}, slice};
+use core::{fmt::{Debug, Display, Write}, mem::ManuallyDrop, ops::{Deref, DerefMut, Index, IndexMut, RangeBounds}, ptr::{self, copy_nonoverlapping}, slice};
 use crate::convert::{strify, strify_mut};
 
 use core::ops::Bound::*;

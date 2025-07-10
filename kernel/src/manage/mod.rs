@@ -18,13 +18,13 @@ pub use kernel_state::*;
 /// - set to `Panic` in the default panic handler
 pub static KERNEL_STATE: RwLock<KernelState> = RwLock::new(KernelState::Init(KernelInitState::Base));
 
-
 #[panic_handler]
 pub fn panic_handler(info: &PanicInfo) -> ! {
 
     if RENDERER.is_locked() {
         unsafe { RENDERER.force_unlock() }
     }
+
     let mut rend = RENDERER.lock();
     if rend.column() > 0 {
         rend.endl();
@@ -37,7 +37,7 @@ pub fn panic_handler(info: &PanicInfo) -> ! {
     //let msg = info.message().as_str();
     let msg = match info.message().as_str() {
         Some(m) => Some(m),
-        None => None,
+        None => *ministd::PANIC_FMT_MSG.read(),
     };
     let location = info.location().unwrap();
 
@@ -64,6 +64,7 @@ pub fn panic_handler(info: &PanicInfo) -> ! {
     match msg {
         Some(m) => {
             locked_print!(rend, "error message: ");
+            rend.set_color(0xffffff);
             rend.println(m.as_bytes());
         },
         None => locked_println!(rend, "No error message given!"),

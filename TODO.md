@@ -15,5 +15,4 @@ Yes, this is my todolist. Take a look if interested.
 ## Rust
 
 ### Ministd
-- Vec redo (pretty sketchy)
 - Add support for aarch64

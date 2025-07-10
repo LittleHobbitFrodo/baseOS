@@ -45,8 +45,8 @@ for a in $archs; do
 
     note "creating ISO for $a target"
 
-    if [ -e "$iso" ]; then
-        rm -rf $iso/*
+    if [ -e "$iso-$(get_arch $a)" ]; then
+        rm -rf $iso-$(get_arch $a)/*
     fi
 
     if [ ! -e "$(kernel_full $a)" ]; then

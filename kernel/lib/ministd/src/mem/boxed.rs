@@ -5,13 +5,12 @@
 // the (almost) standard implementation of `Box<T>` structure
 
 use core::alloc::{GlobalAlloc, Layout};
-use core::default;
 use core::fmt::Display;
 use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ptr::{drop_in_place, NonNull};
 use core::ops::{Deref, DerefMut};
 
-use crate::{TryClone, Nothing};
+use crate::TryClone;
 use crate::{mem::alloc::ALLOCATOR};
 
 
@@ -223,18 +222,3 @@ where T: Sized + TryClone, T::Error: Default {
         })
     }
 }
-
-/*impl<T: Sized + TryClone + Default> TryClone for Box<T> {
-    type Error = Nothing;
-    fn try_clone(&self) -> Result<Self, Self::Error>
-        where Self: Sized {
-        let val = match self.as_ref().try_clone() {
-            Ok(v) => v,
-            Err(_) => return Err(Nothing::default()),
-        };
-
-        Ok(Self {
-            data: unsafe { ALLOCATOR.allocate(val)? }
-        })
-    }
-}*/

@@ -10,7 +10,7 @@ use crate::renderer;
 
 /// initializes allocator
 #[inline]
-pub fn allocator() -> Result<(), ()> {
+pub fn allocator() -> Result<(), Option<&'static str>> {
     alloc::init()
 }
 

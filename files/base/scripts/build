@@ -2,6 +2,12 @@
 
 source "$PWD/files/base/scripts.conf"
 
+limine_path="$PWD/bootloader"
+
+kernel_path="$PWD/files"
+image_path="$PWD/files"
+
+
 archs=""
 debug=false
 if [ "$#" != 0 ]; then
@@ -60,17 +66,20 @@ for a in $archs; do
 
     cd ..
 
-    cp $PWD/kernel/bin/$(get_arch $a)-unknown-none/release/baseOS ./tmp/kernel/kernel.o
+    #   copy compiled kernel into `files` directory
+    cp $PWD/kernel/bin/$(get_arch $a)-unknown-none/release/baseOS $(kernel_full $a)
 
-
+    #cp $PWD/kernel/bin/$(get_arch $a)-unknown-none/release/baseOS ./tmp/kernel/kernel.o
     #   link kernel
     #find "./tmp/kernel" -name "*.o" -print0 | xargs -0 $linker -m "elf_$(get_arch $a)" -nostdlib -static --no-dynamic-linker -z text -z max-page-size=0x1000 -T "$PWD/kernel/linker.ld" -o $(kernel_full $a)
     #if [ "$?" != 0 ]; then
     #    error "failed to link kernel"
     #    exit 2
     #fi
-    cp ./tmp/kernel/kernel.o $(kernel_full $a)
-    
+    #cp ./tmp/kernel/kernel.o $(kernel_full $a)
+
+    #   clear temporary files for other builds
     rm -rf ./tmp/*
+
 
 done
