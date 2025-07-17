@@ -6,7 +6,7 @@
 
 use ministd::{dbg, io, panic_fmt, Rc};
 use ministd::{println, print, locked_println, eprintln, init};
-use ministd::{Box, Array, Vec, String, HashMap};
+use ministd::{Box, Array, Vec, String, HashMap, vec};
 
 use crate::manage::*;
 
@@ -30,7 +30,9 @@ fn init() -> Result<(), ()> {
 
     println!("hello world!");
 
-    //let rc = Rc::new(69 as usize);
+
+
+    println!("OK");
 
     Ok(())
 

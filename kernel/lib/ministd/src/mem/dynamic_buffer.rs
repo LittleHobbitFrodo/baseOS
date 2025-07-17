@@ -62,6 +62,15 @@ impl<T: Sized, const STEP: usize> DynamicBuffer<T, STEP> {
         }
     }
 
+    pub(crate) const fn from_raw(data: NonNull<T>, cap: u32, size: u32) -> DynamicBuffer<T, STEP> {
+        Self {
+            data: unsafe { NonNull::new_unchecked(data.as_ptr() as *mut u8) },
+            cap,
+            size,
+            _marker: PhantomData,
+        }
+    }
+
     /// Constructs `DynamicBuffer<T>` with some elements allocated
     /// - **panics** if allocation fails
     /// - `size = 0`
@@ -101,6 +110,49 @@ impl<T: Sized, const STEP: usize> DynamicBuffer<T, STEP> {
         Ok(Self {
             data: unsafe { NonNull::new_unchecked(data) },
             cap: cap as u32,
+            size: 0,
+            _marker: PhantomData
+        })
+    }
+
+
+    /// Constructs `DynamicBuffer<T>` with some elements allocated
+    /// - **panics** if allocation fails
+    /// - `size = 0`
+    /// - `capacity` is not aligned to `STEP`
+    pub fn with_exact_capacity(capacity: usize) -> Self {
+
+        let l = Self::layout_for_exact(capacity);
+
+        let data = unsafe { ALLOCATOR.alloc(l) };
+
+        assert!(!data.is_null(), "failed to allocate data");
+
+        Self {
+            data: unsafe { NonNull::new_unchecked(data) },
+            cap: capacity as u32,
+            size: 0,
+            _marker: PhantomData
+        }
+    }
+
+    /// Tries to construct `DynamicBuffer<T>` with some elements allocated
+    /// - returns `Err` if allocation fails
+    /// - `size = 0`
+    /// - `capacity` is not aligned to `STEP`
+    pub fn try_with_exact_capacity(capacity: usize) -> Result<Self, ()> {
+
+        let l = Self::layout_for_exact(capacity);
+
+        let data = unsafe { ALLOCATOR.alloc(l) };
+
+        if data.is_null() {
+            return Err(());
+        }
+
+        Ok(Self {
+            data: unsafe { NonNull::new_unchecked(data) },
+            cap: capacity as u32,
             size: 0,
             _marker: PhantomData
         })
@@ -152,6 +204,7 @@ impl<T: Sized, const STEP: usize> DynamicBuffer<T, STEP> {
 
     /// Resizes (reallocates) the buffer to certain size
     /// - `size` is aligned to `STEP`
+    /// - **no elements are dropped**
     /// - **no-op** if `capacity` would be the same`
     /// - if `self.is_empty()` allocates new data
     /// - **panics** if allocation fails
@@ -190,6 +243,7 @@ impl<T: Sized, const STEP: usize> DynamicBuffer<T, STEP> {
 
     /// Tries to resize (reallocate) the buffer to certain size
     /// - `size` is aligned to `STEP`
+    /// - **no elements are dropped**
     /// - **no-op** if `capacity` would be the same`
     /// - if `self.is_empty()` allocates new data
     /// - returns `Err` if allocation fails
@@ -231,6 +285,7 @@ impl<T: Sized, const STEP: usize> DynamicBuffer<T, STEP> {
 
     /// Resizes (reallocates) the buffer to exact size
     /// - **no-op** if `capacity` would be the same`
+    /// - **no elements are dropped**
     /// - if `self.is_empty()` allocates new data
     /// - **panics** if allocation fails
     /// - **Copies exactly `self.size` elements to the new location**
@@ -264,6 +319,7 @@ impl<T: Sized, const STEP: usize> DynamicBuffer<T, STEP> {
 
     /// Tries to resize (reallocate) the buffer to exact size
     /// - **no-op** if `capacity` would be the same`
+    /// - **no elements are dropped**
     /// - if `self.is_empty()` allocates new data
     /// - **panics** if allocation fails
     /// - **Copies exactly `self.size` elements to the new location**
@@ -461,6 +517,11 @@ impl<T: Sized, const STEP: usize> DynamicBuffer<T, STEP> {
     }
 
     /// Describes memory layout for some capacity
+    /// 
+    /// - to be clear: (this may change in next versions)
+    /// ```
+    /// Layout::from_size_align_unchecked(size_of::<T>() * Self::cap_next(capacity), align_of::<T>())
+    /// ``````
     pub const fn layout_for(capacity: usize) -> Layout {
         let size = unsafe {
             size_of::<T>().unchecked_mul(Self::cap_next(capacity))
@@ -470,6 +531,11 @@ impl<T: Sized, const STEP: usize> DynamicBuffer<T, STEP> {
     }
 
     /// Describes memory layout for some capacity without aligning to `STEP`
+    /// 
+    /// - to be clear: (this may change in next version)
+    /// ```
+    /// Layout::from_size_align_unchecked(size_of::<T>() * capacity, align_of::<T>())
+    /// ```
     pub const fn layout_for_exact(capacity: usize) -> Layout {
         unsafe { Layout::from_size_align_unchecked(size_of::<T>().unchecked_mul(capacity), align_of::<T>()) }
     }
@@ -477,6 +543,14 @@ impl<T: Sized, const STEP: usize> DynamicBuffer<T, STEP> {
     /// aligns the capacity up to next generic `STEP`
     /// - result is greater than `STEP`
     /// - returns number of elements
+    /// 
+    /// ```
+    /// if STEP == 0 {
+    ///     (cap + 1).next_power_of_two()
+    /// } else {
+    ///     (cap + 1).next_multiple_of(STEP)
+    /// }
+    /// ```
     pub const fn cap_next(cap: usize) -> usize {
         if STEP == 0 {
             (cap + 1).next_power_of_two()

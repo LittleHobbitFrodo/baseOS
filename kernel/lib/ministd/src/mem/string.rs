@@ -809,4 +809,3 @@ impl<const STEP: usize> Write for String<STEP> {
         self.try_push_str(s).map_err(|_| core::fmt::Error)
     }
 }
-

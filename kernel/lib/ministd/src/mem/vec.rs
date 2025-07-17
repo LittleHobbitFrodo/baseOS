@@ -3,20 +3,28 @@
 //      on OS template on which to build
 
 
+use core::alloc::Layout;
 use core::borrow::{Borrow, BorrowMut};
+use core::ffi::CStr;
 use core::fmt::Debug;
+use core::hash::Hash;
+use core::hint::unreachable_unchecked;
 use core::mem::{ManuallyDrop, MaybeUninit};
-use core::ptr::drop_in_place;
-use core::slice::{self, from_raw_parts, from_raw_parts_mut};
-use core::ops::{Bound::*, Index, IndexMut, RangeBounds, Deref, DerefMut};
+use core::ptr::{copy_nonoverlapping, drop_in_place, NonNull};
+use core::slice::{self, from_raw_parts, from_raw_parts_mut, Chunks, ChunksExact, ChunksExactMut, ChunksMut, Windows};
+use core::ops::{Bound::*, Deref, DerefMut, Index, IndexMut, Range, RangeBounds};
 use core::cmp::Ordering::*;
 
 use crate::mem::DynamicBuffer;
-use crate::TryClone;
+use crate::{panic_fmt, Box, TryClone};
 
 
-/// A contiguous growable array type, written as Vec<T>, short for ‘vector’
-/// - this implementation will also allow you to tweak memory management using generic parameters
+
+
+/// A contiguous growable array type, written as `Vec<T>`, short for ‘vector’
+/// - this implementation will also allow you to **tweak memory management using generic** parameters
+/// - this vector is not an exact representation of the `std::Vec`, all important functions are preserved, some functions are added
+///   - yo access the `chunks`, `windows`, etc. functions, use the `as_slice` function as follows: `self.as_slice().chunks()`
 /// 
 /// ### Generic parameters
 /// 1. `T`: datatype of each element
@@ -26,7 +34,52 @@ pub struct Vec<T: Sized, const STEP: usize = 0> {
     data: DynamicBuffer<T, STEP>,
 }
 
+impl<T: Sized> Vec<T> {
+    /// Constructs new `Vec<T>` with `n` elements
+    pub fn from_elem<const S: usize>(value: T, n: usize) -> Vec<T, S>
+        where T: Clone {
+        
+        let mut vec = Vec::with_capacity(n);
+        unsafe { vec.set_len(n) };
+    
+        let mut ptr = vec.as_non_null();
+
+        for _ in 0..n {
+            unsafe {
+                ptr.write(value.clone());
+                ptr = ptr.add(1);
+            }
+        }
+
+        vec
+
+    }
+
+    /// Constructs new `Vec<T>`
+    pub fn vec_new() -> Vec<T> {
+        Vec { data: DynamicBuffer::empty() }
+    }
+
+    /// Constructs new `Vec<T>` with certain `STEP`
+    pub fn vec_new_with_step<const STEP: usize>() -> Vec<T, STEP> {
+        Vec { data: DynamicBuffer::empty() }
+    }
+
+
+}
+
 impl<T: Sized, const STEP: usize> Vec<T, STEP> {
+
+    /// Describes memory layout for `Vec<T>` with certain `capacity`
+    /// - is aligned to `STEP`
+    pub const fn layout_for(capacity: usize) -> Layout {
+        DynamicBuffer::<T>::layout_for(capacity)
+    }
+
+    /// Describes memory layout for some capacity without aligning to `STEP``
+    pub const fn layout_for_exact(capacity: usize) -> Layout {
+        DynamicBuffer::<T>::layout_for_exact(capacity)
+    }
 
 
     /// Expands the `capacity` of the vector by `STEP`
@@ -46,9 +99,18 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     }
 
     /// Constructs new empty `Vec<T>`
+    /// - does not allocate any memory
     pub const fn new() -> Self {
         Self {
             data: DynamicBuffer::empty(),
+        }
+    }
+
+    /// Constructs new empty `Vec<T>` with certain `STEP`
+    /// - does not allocate memory
+    pub const fn new_with_step<const S: usize>() -> Vec<T, S> {
+        Vec {
+            data: DynamicBuffer::<T, S>::empty(),
         }
     }
 
@@ -72,9 +134,258 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
         })
     }
 
+    /// Resizes the vector to certain size
+    /// - **panics** if reallocation fails
+    /// 
+    /// If `new_len` is greater than `len`, the `Vec` is extended by the difference, with each additional slot filled with `value`. If `new_len` is less than `len`, the `Vec` is simply truncated
+    pub fn resize(&mut self, size: usize, value: T)
+    where T: Clone {
+
+        match self.len().cmp(&size) {
+            Equal => return,
+
+            Less => {
+                //  Append the vector
+                let len = size - self.len();
+                self.reserve(len);
+
+                unsafe {
+                    let mut ptr = self.data.data().add(self.len());
+
+                    for _ in 0..len {
+                        ptr.write(value.clone());
+                        ptr = ptr.add(1);
+                    }
+
+                }
+            },
+
+            Greater => {
+                //  Shrink the vector
+                unsafe { self.truncate_unchecked(size); }
+            }
+        }
+
+        self.data.size = size as u32;
+
+    }
+
+    /// Resizes the `Vec` in-place so that `len` is equal to `new_len`
+    /// - **panics** if allocation fails
+    /// 
+    /// If `new_len` is greater than `len`, the `Vec` is extended by the difference, with each additional slot filled with the result of calling the closure `f`. The return values from `f` will end up in the `Vec` in the order they have been generated
+    /// 
+    /// If `new_len` is less than `len`, the `Vec` is simply truncated
+    pub fn resize_with<F>(&mut self, new_len: usize, mut f: F)
+        where F: FnMut() -> T {
+        
+        match self.len().cmp(&new_len) {
+            Equal => return,
+            Less => {
+                //  Append to the vector
+                let len = new_len - self.len();
+                self.reserve(len);
+
+                unsafe {
+                    let mut ptr = self.data.data().add(self.len());
+
+                    for _ in 0..len {
+                        ptr.write(f());
+
+                        ptr = ptr.add(1);
+                    }
+                }
+            },
+            Greater => {
+                //  Shrink the vector
+                unsafe { self.truncate_unchecked(new_len) };
+            }
+        }
+
+        self.data.size = new_len as u32;
+
+    }
+
+    /// Resizes the `Vec` in-place so that `len` is equal to `new_len`
+    /// - returns `Err` if allocation fails
+    /// 
+    /// If `new_len` is greater than `len`, the `Vec` is extended by the difference, with each additional slot filled with the result of calling the closure `f`. The return values from `f` will end up in the `Vec` in the order they have been generated
+    /// 
+    /// If `new_len` is less than `len`, the `Vec` is simply truncated
+    pub fn try_resize_with<F>(&mut self, new_len: usize, mut f: F) -> Result<(), ()>
+        where F: FnMut() -> T {
+        
+        match self.len().cmp(&new_len) {
+            Equal => return Ok(()),
+            Less => {
+                //  Append to the vector
+                let len = new_len - self.len();
+                self.try_reserve(len)?;
+
+                unsafe {
+                    let mut ptr = self.data.data().add(self.len());
+
+                    for _ in 0..len {
+                        ptr.write(f());
+
+                        ptr = ptr.add(1);
+                    }
+                }
+            },
+            Greater => {
+                //  Shrink the vector
+                unsafe { self.truncate_unchecked(new_len) };
+            }
+        }
+
+        self.data.size = new_len as u32;
+
+        Ok(())
+
+    }
+
+    /// Tries to resize the vector to certain size
+    /// - returns `Err` if allocation fails
+    /// 
+    /// If `new_len` is greater than `len`, the `Vec` is extended by the difference, with each additional slot filled with `value`. If `new_len` is less than `len`, the `Vec` is simply truncated
+    pub fn try_resize(&mut self, size: usize, value: T) -> Result<(), ()>
+    where T: Clone {
+
+        match self.len().cmp(&size) {
+
+            Equal => return Ok(()),
+
+            Less => {
+                //  Append the vector
+                let len = size - self.len();
+                self.try_reserve(len)?;
+
+                let slice = unsafe { slice::from_raw_parts_mut(self.as_mut_ptr().add(self.len()), len) };
+
+                for i in slice {
+                    *i = value.clone();
+                }
+            },
+
+            Greater => {
+                //  Shrink the vector
+                unsafe { self.truncate_unchecked(size); }
+            }
+        }
+
+        self.data.size = size as u32;
+        
+        Ok(())
+
+    }
+
+    /// Clones and appends all elements in a slice
+    /// - **panics** if allocation fails
+    pub fn extend_from_slice(&mut self, other: &[T])
+    where T: Clone {
+
+        self.reserve(other.len());
+
+        let slice = unsafe { slice::from_raw_parts_mut(self.as_mut_ptr().add(self.len()), other.len()) };
+
+        for (i, item) in slice.iter_mut().enumerate() {
+            *item = other[i].clone();
+        }
+
+        self.data.size += other.len() as u32;
+
+    }
+
+    /// Tries to clone and append all elements in a slice
+    /// - return `Err` if allocation fails
+    pub fn try_extend_from_slice(&mut self, other: &[T]) -> Result<(), ()>
+    where T: Clone {
+
+        self.try_reserve(other.len())?;
+
+        let slice = unsafe { slice::from_raw_parts_mut(self.as_mut_ptr().add(self.len()), other.len()) };
+
+        for (i, item) in slice.iter_mut().enumerate() {
+            *item = other[i].clone();
+        }
+
+        self.data.size += other.len() as u32;
+
+        Ok(())
+
+    }
+
+    /// Given a range `src`, clones a slice of elements in that range and appends it to the end
+    /// - `src` must be a range that can form a valid subslice of the `Vec`
+    /// - **panics** if range is out of bounds or allocation fails
+    pub fn extend_from_within<R>(&mut self, src: R)
+        where T: Clone, R: RangeBounds<usize> {
+        
+        let (start, end) = self.handle_bounds(&src);
+
+        if start > self.len() || end > self.len() {
+            panic_fmt!("slice {start}..{end} is out of bounds 0..{}", self.len());
+        }
+
+        let len = end - start;
+
+        self.reserve(len);
+
+        unsafe {
+            let slice = from_raw_parts(self.as_ptr().add(start), len);
+
+            let mut ptr = self.data.data().add(self.len());
+
+            for i in slice {
+                ptr.write(i.clone());
+
+                ptr = ptr.add(1);
+            }
+        }
+
+        self.data.size += len as u32;
+
+    }
+
+    /// Given a range `src`, clones a slice of elements in that range and appends it to the end
+    /// - `src` must be a range that can form a valid subslice of the `Vec`
+    /// - **panics** if range is out of bounds
+    /// - returns `Err` if allocation fails
+    pub fn try_extend_from_within<R>(&mut self, src: R) -> Result<(), ()>
+        where T: Clone, R: RangeBounds<usize> {
+        
+        let (start, end) = self.handle_bounds(&src);
+
+        if start > self.len() || end > self.len() {
+            panic_fmt!("slice {start}..{end} is out of bounds 0..{}", self.len());
+        }
+
+        let len = end - start;
+
+        self.try_reserve(len)?;
+
+        unsafe {
+            let slice = from_raw_parts(self.as_ptr().add(start), len);
+
+            let mut ptr = self.data.data().add(self.len());
+
+            for i in slice {
+                ptr.write(i.clone());
+
+                ptr = ptr.add(1);
+            }
+        }
+
+        self.data.size += len as u32;
+
+        Ok(())
+
+    }
+
+
     /// Reserves capacity for at least `additional` more elements
     /// - **panics** if allocation fails
-    /// - **null checking** is done internally via `DynamicBuffer`
+    /// - `capacity` will be greater than or equal to `self.len() + additional` 
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
         if self.len() + additional > self.capacity() {
@@ -85,7 +396,7 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
 
     /// Tries to reserve capacity for at least `additional` more elements
     /// - returns `Err` if allocation fails
-    /// - **null checking** is done internally via `DynamicBuffer`
+    /// - `capacity` will be greater than or equal to `self.len() + additional` 
     #[inline]
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), ()> {
         if self.len() + additional > self.capacity() {
@@ -96,8 +407,9 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     }
 
     /// Reserves the minimum capacity for at least `additional` more elements
+    /// - unlike `reserve`, this does not overallocate memory
     /// - **panics** if allocation fails
-    /// - **null checking** is done internally via `DynamicBuffer`
+    /// - `capacity` will be greater than or equal to `self.len() + additional` 
     #[inline]
     pub fn reserve_exact(&mut self, additional: usize) {
         if self.len() + additional > self.capacity() {
@@ -106,8 +418,9 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     }
 
     /// Tries to reserve the minimum capacity for at least `additional` more elements
+    /// - unlike `try_reserve`, this does not overallocate memory
     /// - returns `Err` if allocation fails
-    /// - **null checking** is done internally via `DynamicBuffer`
+    /// - `capacity` will be greater than or equal to `self.len() + additional` 
     #[inline]
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), ()> {
         if self.len() + additional > self.capacity() {
@@ -162,6 +475,17 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
         }
     }
 
+    /// Appends the vector
+    /// - does not check for `capacity`
+    /// - use only if you are sure that `capacity` will not be exceeded
+    #[inline]
+    pub unsafe fn push_within_capacity_unchecked(&mut self, val: T) {
+        unsafe {
+            self.as_mut_ptr().add(self.len()).write(val);
+        }
+        self.data.size += 1;
+    }
+
     /// Shrinks the capacity of the vector as much as possible
     /// - **panics** if allocation fails
     #[inline]
@@ -209,16 +533,43 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
         }
     }
 
+    /// Shortens the vector, keeping the first `len` elements and dropping the rest
+    /// 
+    /// If `len` is greater or equal to the vector’s current length, this has no effect
+    pub fn truncate(&mut self, len: usize) {
+        if len < self.len() {
+            unsafe {
+                if core::mem::needs_drop::<T>() {
+                    let slice = from_raw_parts_mut(self.as_mut_ptr().add(len), self.len() - len).as_mut_ptr();
+                    drop_in_place(slice);
+                }
+            }
+            self.data.size = len as u32;
+        }
+    }
+
+    /// Shortens the vector, keeping the first `len` elements and dropping the rest
+    /// - does not check if the length of the vector is greater than `len`
+    /// - please use only if you are sure that `len < self.len()`
+    pub unsafe fn truncate_unchecked(&mut self, len: usize) {
+        unsafe {
+            if core::mem::needs_drop::<T>() {
+                let slice = from_raw_parts_mut(self.as_mut_ptr(), self.len() - len).as_mut_ptr();
+                drop_in_place(slice);
+            }
+        }
+        self.data.size -= len as u32;
+    }
 
     /// Removes and drops the element at `index`
     /// - **panics** if `index > self.len()`
     /// - **no-op** if `self.is_empty()`
     /// - preserves ordering of the vector
     ///   - this is `O(n)` operation
-    pub fn remove(&mut self, index: usize) {
+    pub fn remove_drop(&mut self, index: usize) {
         if self.capacity() > 0 {
             if index >= self.len() {
-                panic!("index out of bounds");
+                panic_fmt!("index {index} out of bounds 0..{}", self.len());
             }
 
             unsafe {
@@ -235,14 +586,19 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
         }
     }
 
+    /// Returns a NonNull pointer to the vector’s buffer, **or a dangling NonNull** pointer valid for zero sized reads if the vector didn’t allocate
+    pub const fn as_non_null(&self) -> NonNull<T> {
+        self.data.data()
+    }
+
     /// Removes and returns the element at `index`
     /// - **panics** if `index > self.len() || self.is_empty()`
     /// - preserves ordering of the vector
     ///   - this is `O(n)` operation
-    pub fn remove_ret(&mut self, index: usize) -> T {
+    pub fn remove(&mut self, index: usize) -> T {
         if self.capacity() > 0 {
             if index >= self.len() {
-                panic!("index out of bounds");
+                panic_fmt!("index {index} out of bounds 0..{}", self.len());
             }
 
             let ret;
@@ -276,7 +632,7 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
         let len = self.len();
 
         if index > len {
-            panic!("index is out of bounds");
+            panic_fmt!("index {index} is out of bounds 0..{len}");
         } else if index == len {
             self.push(val);
             return;
@@ -332,10 +688,128 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
 
     }
 
+
+    /// Retains only the elements specified by the predicate.
+    /// 
+    /// In other words, remove all elements `e` for which `f(&e)` returns `false`. This method operates in place, visiting each element exactly once in the original order, and preserves the order of the retained elements
+    /// - this is an `O(n)` operation
+    pub fn retain<F: Fn(&T) -> bool>(&mut self, f: F) {
+        let mut ptr = self.data.data();
+        let mut i = 0;
+
+        loop {
+
+            if !f(unsafe { ptr.as_ref() }) {
+                self.remove_drop(i)
+            }
+
+            if i >= self.len() {
+                break;
+            }
+
+            unsafe { ptr = ptr.add(1) };
+            i += 1;
+        }
+
+    }
+
+    pub fn retain_mut<F: FnMut(&mut T) -> bool>(&mut self, mut f: F) {
+        let mut ptr = self.data.data();
+        let mut i = 0;
+
+        loop {
+
+            if !f(unsafe { ptr.as_mut() }) {
+                self.remove_drop(i)
+            }
+
+            if i >= self.len() {
+                break;
+            }
+
+            unsafe { ptr = ptr.add(1) };
+            i += 1;
+        }
+
+    }
+
+    /// Constructs new `Vec<T>` from slice of `T`
+    /// - **panics** if allocation fails
+    pub fn from_slice(slice: &[T]) -> Self
+        where T: Sized + Clone {
+
+        let mut db = DynamicBuffer::<T, STEP>::with_capacity(slice.len());
+        db.size = slice.len() as u32;
+
+        let mut this = db.data();
+
+        unsafe {
+            for i in slice.iter() {
+                this.write(i.clone());
+                this = this.add(1);
+            }
+        }
+
+        Self { data: db }
+    }
+
+    /// Tries to construct `Vec<T>` from slice of `T`
+    /// - returns `Err` if allocation fails of `slice[i].try_clone()` returns `Err`
+    pub fn try_from_slice(slice: &[T]) -> Result<Self, ()>
+        where T: Sized + TryClone {
+        
+        let mut db = DynamicBuffer::<T, STEP>::try_with_capacity(slice.len())?;
+        db.size = slice.len() as u32;
+
+        let mut this = db.data();
+
+        unsafe {
+            for (i, item) in slice.iter().enumerate() {
+                let e = match item.try_clone() {
+                    Ok(e) => e,
+                    Err(_) => {
+                        let slice = from_raw_parts_mut(db.data().as_ptr(), i).as_mut_ptr();
+                        drop_in_place(slice);
+                        return Err(());
+                    }
+                };
+                this.write(e);
+
+                this = this.add(1);
+            }
+        }
+
+        Ok(Self { data: db })
+
+    }
+
+    /// Constructs new `Vec<T>` from slice of `U`
+    /// - **panics** if allocation fails
+    /// - `T` must implement `From<&U>`
+    pub fn from_different_slice<'l, U>(slice: &'l [U]) -> Self
+        where T: From<&'l U>, U: Sized{
+
+        let mut db = DynamicBuffer::<T, STEP>::with_capacity(slice.len());
+        db.size = slice.len() as u32;
+
+        let mut this = db.data();
+
+        unsafe {
+            for i in slice.iter() {
+                this.write(T::from(i));
+
+                this = this.add(1);
+            }
+        }
+
+        Self { data: db }
+
+    }
+
     /// Drops the last element of the vector
     /// - **no-op** if `self.is_empty()`
     /// - does not affect `capacity`
-    pub fn pop(&mut self) {
+    pub fn pop_drop(&mut self) {
 
         if self.len() > 0 {
             unsafe {
@@ -348,7 +822,7 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     /// Removes and returns the last element of the vector
     /// - **no-op** if `self.is_empty()`
     /// - does not affect `capacity`
-    pub fn pop_ret(&mut self) -> Option<T> {
+    pub fn pop(&mut self) -> Option<T> {
 
         if self.len() > 0 {
             self.data.size -= 1;
@@ -386,22 +860,43 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     }
 
     /// Drops the last element if the vector if `f` returns `true`
-    pub fn pop_if<F>(&mut self, f: F)
-    where F: Fn(&T) -> bool {
-        let last = match self.last() {
+    pub fn pop_drop_if<F>(&mut self, predicate: impl FnOnce(&mut T) -> bool)
+    where F: FnOnce(&mut T) -> bool {
+        let last = match self.last_mut() {
             Some(l) => l,
             None => return,
         };
 
 
 
-        if f(last) {
+        if predicate(last) {
             
-            unsafe {
-                drop_in_place(self.data.data().add(self.len() - 1).as_ptr());
-            }
-
             self.data.size -= 1;
+
+            unsafe {
+                drop_in_place(self.data.data().add(self.len()).as_ptr());
+            }
+        }
+    }
+
+    /// Removes and returns the last element if the vector if `f` returns `true`
+    pub fn pop_if(&mut self, predicate: impl FnOnce(&mut T) -> bool) -> Option<T> {
+        let last = match self.last_mut() {
+            Some(l) => l,
+            None => return None,
+        };
+
+
+
+        if predicate(last) {
+            
+            self.data.size -= 1;
+
+            unsafe {
+                Some(self.data.data().add(self.len()).read())
+            }
+        } else {
+            None
         }
     }
 
@@ -446,15 +941,10 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
 
     }
 
-    
 
 
 
-
-
-
-
-    /// Forces the length of the vector to new_len.
+    /// Forces the length of the vector to `new_len`
     /// - this will not construct and/or modify `capacity`
     /// - this function does not check for any boundaries (including `capacity`)
     #[inline(always)]
@@ -462,8 +952,101 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
         self.data.size = len as u32;
     }
 
+    /// Removes an element from vector and returns it
+    /// - the removed element is replaced by the last element of the vector
+    /// 
+    /// **panics** if index is out of bounds or `self.len() == 1`
+    pub fn swap_remove(&mut self, index: usize) -> T {
+
+        if index < self.len() && self.len() > 1 {
+            
+            self.data.size -= 1;
+
+            unsafe {
+                let e = self.data.data().add(index);
+
+                drop_in_place(e.as_ptr());
+
+                e.write(self.data.data().add(self.len()).read());
+
+                e.read()
+
+            }
+
+        } else {
+            if index >= self.len() {
+                panic_fmt!("index {index} is out of bounds 0..{}", self.len());
+            } else {
+                panic!("calling `Vec::swap_remove` on vector with length equal to 1 could end up with undefined behaviour");
+            }
+        }
+
+    }
+
+    /// Removes an element from vector and returns it
+    /// - the removed element is replaced by the last element of the vector
+    /// - **does not check bounds or state of the vector**
+    ///   - use only if you are sure that `index` is in bounds
+    pub unsafe fn swap_remove_unchecked(&mut self, index: usize) -> T {
+
+        self.data.size -= 1;
+
+        unsafe {
+            let e = self.data.data().add(index);
+
+            drop_in_place(e.as_ptr());
+
+            e.write(self.data.data().add(self.len()).read());
+            e.read()
+        }
+
+    }
+
+    /// Removes an element from vector and drops it
+    /// - the removed element is replaces by `T::default()`
+    /// 
+    /// - **panics** if index is out of bounds
+    pub fn drop_remove(&mut self, index: usize)
+        where T: Default {
+
+        if index < self.len() {
+            self.data.size -= 1;
+        
+            unsafe {
+                let e = self.data.data().add(index);
+
+                drop_in_place(e.as_ptr());
+
+                e.write(T::default());
+            }
+        } else {
+            panic_fmt!("index {index} is out of bounds 0..{}", self.len());
+        }
+    }
+
+
+    /// Removes an element from vector and drops it
+    /// - the removed element is replaces by `T::default()`
+    /// - **does not check bounds or state of the vector**
+    ///   - use only if you are sure that `index` is in bounds
+    pub unsafe fn drop_remove_unchecked(&mut self, index: usize)
+        where T: Default {
+        
+        self.data.size -= 1;
+
+        unsafe {
+            let e = self.data.data().add(index);
+
+            drop_in_place(e.as_ptr());
+
+            e.write(T::default());
+        }
+
+    }
+
     /// Clears the vector, removing all values.
     /// - note that this method has no effect on the allocated `capacity`
+    #[inline]
     pub fn clear(&mut self) {
         if core::mem::needs_drop::<T>() && self.len() > 0 {
             unsafe {
@@ -476,8 +1059,9 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     /// Consumes and leaks the `Vec`, returning mutable reference to its data
     /// - **panics** if has no data
     /// - does not shrink the `capacity`
-    /// - dropping the returned reference may result in memory leak
+    /// - deciding to not drop the returned reference may result in memory leak
     pub fn leak<'l>(self) -> &'l mut [T] {
+
         if self.capacity() > 0 {
             panic!("Vec does not contain any data");
         }
@@ -496,6 +1080,8 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
             None
         }
     }
+
+
 
 
 
@@ -534,7 +1120,6 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
 
 
 
-
     /// returns contents of the vector as slice
     /// - or `None` if vector does not have any contents
     pub const fn as_slice(&self) -> Option<&[T]> {
@@ -568,24 +1153,6 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
         unsafe { from_raw_parts_mut(self.data.data().as_ptr(), self.len())}
     }
 
-    /// Returns the last element of the vector or `None`
-    pub const fn last(&self) -> Option<&T> {
-        if self.len() > 0 {
-            return Some(unsafe { self.data.data().add(self.len() - 1).as_ref() })
-        } else {
-            None
-        }
-    }
-
-    /// Returns the last element of the vector or `None`
-    pub const fn last_mut(&mut self) -> Option<&mut T> {
-        if self.len() > 0 {
-            return Some(unsafe { self.data.data().add(self.len() - 1).as_mut() })
-        } else {
-            None
-        }
-    }
-
 
     /// Checks RangeBound for this vector
     #[inline]
@@ -602,6 +1169,250 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
             Excluded(&val) => val,
             Unbounded => self.len(),
         })
+    }
+
+
+}
+
+impl<T, const STEP: usize, const N: usize> Vec<[T; N], STEP> {
+    pub fn into_flattened(self) -> Vec<T, STEP> {
+
+        let this = ManuallyDrop::new(self);
+
+        let ptr = unsafe { NonNull::new_unchecked(this.data.as_ptr() as *mut T) };
+        let cap = (this.capacity() * N) as u32;
+        let size = (this.len() * N) as u32;
+
+        Vec { data: DynamicBuffer::from_raw(ptr, cap, size) }
+    }
+}
+
+
+impl<T: Sized, const STEP: usize> Vec<T, STEP> {
+
+    //  Deref<[T]>
+
+        /// Returns first element of the vector (if there are any elements)
+    pub fn first(&self) -> Option<&T> {
+        if self.len() > 0 {
+            Some(unsafe { self.data.data().as_ref() })
+        } else {
+            None
+        }
+    }
+
+    /// Returns firs element without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `first()` as safe alternative
+    #[inline(always)]
+    pub unsafe fn first_unchecked(&self) -> &T {
+        unsafe { self.data.data().as_ref() }
+    }
+
+    /// Returns first element as mutable reference
+    pub fn first_mut(&mut self) -> Option<&mut T> {
+        if self.len() > 0 {
+            Some(unsafe { self.data.data().as_mut() })
+        } else {
+            None
+        }
+    }
+
+    /// Returns first element as mutable reference without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `first_mut()` as safe alternative
+    #[inline]
+    pub unsafe fn first_mut_unchecked(&mut self) -> &mut T {
+        unsafe { self.data.data().as_mut() }
+    }
+
+    /// Returns the first and all the rest of the elements of the vector, or None if it is empty
+    pub fn split_first(&self) -> Option<(&T, &[T])> {
+        if self.len() > 0 {
+            let data = self.data.data();
+            Some(unsafe { (data.as_ref(), slice::from_raw_parts(data.add(1).as_ptr(), self.len() - 1))})
+        } else {
+            None
+        }
+    }
+
+    /// Returns the first and all the rest of the elements of the vector without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `split_first()` as safe alternative
+    #[inline]
+    pub unsafe fn split_first_unchecked(&self) -> (&T, &[T]) {
+        unsafe {
+            ( self.data.data().as_ref(),
+            slice::from_raw_parts(self.data.data().add(1).as_ptr(), self.len() - 1) )
+        }
+    }
+
+    /// Returns the first and all the rest of the elements of the vector, or None if it is empty
+    pub fn split_first_mut(&mut self) -> Option<(&mut T, &mut [T])> {
+        if self.len() > 0 {
+            let mut data = self.data.data();
+            Some(unsafe { (data.as_mut(), slice::from_raw_parts_mut(data.add(1).as_ptr(), self.len() - 1))})
+        } else {
+            None
+        }
+    }
+
+    /// Returns the first and all the rest of the elements of the vector without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `split_first_mut()` as safe alternative
+    #[inline]
+    pub unsafe fn split_first_mut_unchecked(&mut self) -> (&mut T, &mut [T]) {
+        unsafe {
+            ( self.data.data().as_mut(),
+            slice::from_raw_parts_mut(self.data.data().add(1).as_ptr(), self.len() - 1) )
+        }
+    }
+
+    /// Returns the last and all the rest of te elements of the vector
+    pub fn split_last(&self) -> Option<(&T, &[T])> {
+        if self.len() > 0 {
+            let data = self.data.data();
+            Some(unsafe { (data.add(self.len() - 1).as_ref(),
+                slice::from_raw_parts(data.as_ptr(), self.len() - 1)) })
+        } else {
+            None
+        }
+    }
+
+    /// Returns the last and all the rest of te elements of the vector without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `split_last()` as safe alternative
+    #[inline]
+    pub unsafe fn split_last_unchecked(&self) -> (&T, &[T]) {
+        unsafe {
+            let data = self.data.data();
+            (data.add(self.len() - 1).as_ref(), slice::from_raw_parts(data.as_ptr(), self.len() - 1))
+        }
+    }
+
+    /// Returns the last and all the rest of te elements of the vector
+    pub fn split_last_mut(&mut self) -> Option<(&mut T, &mut [T])> {
+        if self.len() > 0 {
+            let data = self.data.data();
+            Some(unsafe { (data.add(self.len() - 1).as_mut(),
+                slice::from_raw_parts_mut(data.as_ptr(), self.len() - 1)) })
+        } else {
+            None
+        }
+    }
+
+    /// Returns the last and all the rest of te elements of the vector without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `split_last_mut()` as safe alternative
+    #[inline]
+    pub unsafe fn split_last_mut_unchecked(&mut self) -> (&mut T, &mut [T]) {
+        unsafe {
+            let data = self.data.data();
+            (data.add(self.len() - 1).as_mut(), slice::from_raw_parts_mut(data.as_ptr(), self.len() - 1))
+        }
+    }
+
+    /// Returns the last element of the slice, or None if it is empty
+    pub fn last(&self) -> Option<&T> {
+        if self.len() > 0 {
+            Some(unsafe { self.data.data().add(self.len() - 1).as_ref() })
+        } else {
+            None
+        }
+    }
+    /// Returns the last element of the slice without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `last()` as safe alternative
+    #[inline]
+    pub unsafe fn last_unchecked(&self) -> &T {
+        unsafe { self.data.data().add(self.len() - 1).as_ref() }
+    }
+
+    /// Returns the last element of the slice, or None if it is empty
+    pub fn last_mut(&mut self) -> Option<&mut T> {
+        if self.len() > 0 {
+            Some(unsafe { self.data.data().add(self.len() - 1).as_mut() })
+        } else {
+            None
+        }
+    }
+
+    /// Returns the last element of the slice without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `last_mut()` as safe alternative
+    #[inline]
+    pub unsafe fn last_mut_unchecked(&mut self) -> &mut T {
+        unsafe { self.data.data().add(self.len() - 1).as_mut() }
+    }
+
+
+    /// Returns an array reference to the first `N` items in the vector
+    pub fn first_chunk<const N: usize>(&self) -> Option<&[T; N]> {
+        if self.len() >= N {
+            Some(unsafe { &*(self.as_ptr().cast::<[T; N]>()) })
+        } else {
+            None
+        }
+    }
+
+    /// Returns an array reference to the first `N` items in the vector without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `first_chunk()` as safe alternative
+    #[inline]
+    pub unsafe fn first_chunk_unchecked<const N: usize>(&self) -> &[T; N] {
+        unsafe { &*(self.as_ptr().cast::<[T; N]>()) }
+    }
+
+    /// Returns an array reference to the first `N` items in the vector
+    pub fn first_chunk_mut<const N: usize>(&mut self) -> Option<&mut [T; N]> {
+        if self.len() >= N {
+            Some(unsafe { &mut *(self.as_mut_ptr().cast::<[T; N]>()) })
+        } else {
+            None
+        }
+    }
+
+    /// Returns an array reference to the first `N` items in the vector without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `first_chunk()` as safe alternative
+    #[inline]
+    pub unsafe fn first_chunk_mut_unchecked<const N: usize>(&mut self) -> &mut [T; N] {
+        unsafe { &mut *(self.as_mut_ptr().cast::<[T; N]>()) }
+    }
+
+
+    /// Returns an array reference to the last `N` items in the slice
+    pub fn last_chunk<const N: usize>(&self) -> Option<&[T; N]> {
+        if self.len() > N {
+            Some(unsafe { &*(self.as_ptr().add(self.len() - N).cast::<[T; N]>()) })
+        } else {
+            None
+        }
+    }
+
+    /// Returns an array reference to the last `N` items in the slice without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `last_chunk()` as safe alternative
+    #[inline]
+    pub unsafe fn last_chunk_unchecked<const N: usize>(&self) -> &[T; N] {
+        unsafe { &*(self.as_ptr().add(self.len() - N).cast::<[T; N]>()) }
+    }
+
+    /// Returns an array reference to the last `N` items in the slice
+    pub fn last_chunk_mut<const N: usize>(&mut self) -> Option<&mut [T; N]> {
+        if self.len() > N {
+            Some(unsafe { &mut *(self.as_mut_ptr().add(self.len() - N).cast::<[T; N]>()) })
+        } else {
+            None
+        }
+    }
+
+    /// Returns an array reference to the last `N` items in the slice without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `last_chunk_mut()` as safe alternative
+    #[inline]
+    pub unsafe fn last_chunk_mut_unchecked<const N: usize>(&mut self) -> &mut [T; N] {
+        unsafe { &mut *(self.as_mut_ptr().add(self.len() - N).cast::<[T; N]>()) }
     }
 
     /// Returns an subslice from the vector
@@ -631,8 +1442,9 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
         Some(unsafe { from_raw_parts_mut(self.data.data().add(start).as_ptr(), end - start) })
     }
 
-    /// Returns an sublice from the vector withou doing bounds check
-    /// - does not check if vector has any data
+    /// Returns an sublice from the vector without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `get()` as safe alternative
     pub unsafe fn get_unchecked<R>(&self, range: R) -> &[T]
     where R: RangeBounds<usize> {
 
@@ -642,8 +1454,9 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
         }
     }
 
-    /// Returns an mutable sublice from the vector withou doing bounds check
-    /// - **panics** if has no data
+    /// Returns an mutable sublice from the vector without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `get_mut()` as safe alternative
     pub unsafe fn get_unchecked_mut<R>(&mut self, range: R) -> &[T]
     where R: RangeBounds<usize> {
         let (start, end) = self.handle_bounds(&range);
@@ -652,72 +1465,267 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
         }
     }
 
-    /// Returns iterator for this vector
+
+    /// Returns pointer to data of this vector
+    /// 
+    /// # IMPORTANT
+    /// Returned pointer will not be null even if no data is allocated
     #[inline(always)]
+    pub const fn as_ptr(&self) -> *const T {
+        self.data.as_ptr()
+    }
+
+    /// Returns mutable pointer to data of this vector
+    /// 
+    /// # IMPORTANT
+    /// Returned pointer will not be null even if no data is allocated
+    #[inline(always)]
+    pub const fn as_mut_ptr(&self) -> *mut T {
+        self.data.as_ptr()
+    }
+
+    /// Returns the two raw pointers spanning the slice
+    /// 
+    /// The returned range is half-open, which means that the end pointer points one past the last element of the slice. This way, an empty slice is represented by two equal pointers, and the difference between the two pointers represents the size of the slice
+    /// 
+    /// See `as_ptr` for warnings on using these pointers. The end pointer requires extra caution, as it does not point to a valid element in the slice.
+    /// 
+    /// This function is useful for interacting with foreign interfaces which use two pointers to refer to a range of elements in memory, as is common in C++.
+    /// 
+    /// **note** - bounds are not check in this implementation
+    #[inline]
+    pub const fn as_ptr_range(&self) -> Range<*const T> {
+        Range { start: self.data.as_ptr(), end: unsafe { self.data.as_ptr().add(self.len()) } }
+    }
+
+    /// Returns the two raw pointers spanning the slice
+    /// 
+    /// The returned range is half-open, which means that the end pointer points one past the last element of the slice. This way, an empty slice is represented by two equal pointers, and the difference between the two pointers represents the size of the slice
+    /// 
+    /// See `as_ptr` for warnings on using these pointers. The end pointer requires extra caution, as it does not point to a valid element in the slice.
+    /// 
+    /// This function is useful for interacting with foreign interfaces which use two pointers to refer to a range of elements in memory, as is common in C++.
+    /// 
+    /// **note** - bounds are not check in this implementation
+    #[inline]
+    pub const fn as_mut_ptr_range(&mut self) -> Range<*mut T> {
+        let ptr = self.data.as_ptr();
+        Range { start: ptr, end: unsafe { ptr.add(self.len()) } }
+    }
+
+    /// Gets an reference to underlying array
+    pub fn as_array<const N: usize>(&self) -> Option<&[T; N]> {
+        if self.len() > N {
+            Some(unsafe { &*(self.as_ptr().cast()) })
+        } else {
+            None
+        }
+    }
+
+    /// Gets an reference to underlying array without checking bounds
+    /// /// - can possibly cause **address boundary errors**
+    /// - please use `as_array()` as safe alternative
+    #[inline]
+    pub unsafe fn as_array_unchecked<const N: usize>(&self) -> &[T; N] {
+        unsafe { &*(self.as_ptr().cast()) }
+    }
+
+    /// Gets an mutable reference to underlying array
+    pub fn as_mut_array<const N: usize>(&self) -> Option<&mut [T; N]> {
+        if self.len() > N {
+            Some(unsafe { &mut *(self.as_mut_ptr().cast()) })
+        } else {
+            None
+        }
+    }
+
+    /// Gets an mutable reference to underlying array  without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `as_mut_array()` as safe alternative
+    pub unsafe fn as_mut_array_unchecked<const N: usize>(&mut self) -> &mut [T; N] {
+        unsafe { &mut *(self.as_mut_ptr().cast()) }
+    }
+
+    /// Swaps elements at index `a` and `b`
+    /// - **panics** if out of bounds
+    pub fn swap(&mut self, a: usize, b: usize) {
+
+        if a >= self.len() || b >= self.len() {
+            //  give user an ide where is problem
+            let check = (a >= self.len()) as usize | ((b >= self.len()) as usize) << 1;
+            match check {
+                0b01 => panic_fmt!("argument a = {a} is out of bounds [0..{}]", self.len()),
+                0b10 => panic_fmt!("argument b = {b} is out of bounds [0..{}]", self.len()),
+                0b11 => panic_fmt!("arguments a = {a} and b = {b} are out of bounds [0..{}]", self.len()),
+                _ => unsafe { unreachable_unchecked()},
+            }
+        }
+        if a == b { return } 
+
+        unsafe {
+            let a = self.data.data().add(a);
+
+            let b = self.data.data().add(b);
+
+            let tmp = a.read();
+            a.write(b.read());
+            b.write(tmp);
+        }
+
+    }
+
+    /// Swaps elemetns at index `a` and `b` without checking bounds
+    /// - can possibly cause **address boundary errors**
+    /// - please use `swap()` as safe alternative
+    pub unsafe fn swap_unchecked(&mut self, a: usize, b: usize) {
+        unsafe {
+            let a = self.data.data().add(a);
+
+            let b = self.data.data().add(b);
+
+            let tmp = a.read();
+            a.write(b.read());
+            b.write(tmp);
+        }
+    }
+
+    /// Reverses the order of elements in the vector, in place
+    /// - this is an `O(n)` operation
+    pub fn reverse(&mut self) {
+
+        if self.len() > 1 {
+
+            let mut end = self.len() - 1;
+
+            for i in 0..self.len()/2 {
+                unsafe { self.swap_unchecked(i, end) };
+                end -= 1;
+            }
+
+        }
+
+    }
+
+    /// Returns iterator for this vector
+    /// - checks whether vector is empty or not
+    #[inline]
     pub fn iter<'l>(&'l self) -> core::slice::Iter<'l, T> {
         self.as_slice().expect("Vec has no data").iter()
     }
 
+    /// Returns iterator for this vector
+    /// - does not check if vector is empty
+    ///   - can possibly cause **address boundary errors**
+    /// - please use `iter()` as safe alternative
+    #[inline(always)]
+    pub unsafe fn iter_unchecked<'l>(&'l self) -> core::slice::Iter<'l, T> {
+        unsafe { self.as_slice_unchecked() }.iter()
+    }
+
+    /// Returns mutable iterator for this vector
+    /// - checks whether vector is empty or not
+    #[inline]
     pub fn iter_mut<'l>(&'l mut self) -> core::slice::IterMut<'l, T> {
         self.as_mut_slice().expect("Vec has no data").iter_mut()
     }
 
+    /// Returns mutable iterator for this vector
+    /// - does not check if vector is empty
+    ///   - can possibly cause **address boundary errors**
+    /// - please use `iter_mut()` as safe alternative
+    #[inline(always)]
+    pub unsafe fn iter_mut_unchecked<'l>(&'l mut self) -> core::slice::IterMut<'l, T> {
+        unsafe { self.as_mut_slice_unchecked() }.iter_mut()
+    }
 
-}
-
-impl<T: Sized + Default, const STEP: usize> Vec<T, STEP> {
-
-    /// Removes and drops element at `index`
-    /// - **panics** if `index > self.len()`
-    /// - does not preserve ordering of the vector
-    ///   - assigns `T::default()` to the element
-    /// - this is `O(1)` operation
-    pub fn swap_remove(&mut self, index: usize) {
-        if self.capacity() == 0 || index >= self.len() {
-            if self.capacity() == 0 {
-                panic!("vector has no data");
-            } else {
-                panic!("index out of bounds");
-            }
-        }
-
-        unsafe {
-            let ptr = self.data.data().add(index).as_ptr();
-
-            drop_in_place(ptr);
-
-            ptr.write(T::default())
+    /// Creates a `Vec<T>` directly from a pointer, a length and a capacity
+    /// 
+    /// This is **highly unsafe**, due to the number of invariants that aren’t checked:
+    /// - `ptr` must be allocated via the `ministd::ALLOCATOR` allocator
+    ///   - with `Vec::layout_for()` or `Vec::layout_for_exact()` used for layout description
+    /// - `size` must be less than or equal to `capacity`
+    ///   - The first `size` values must be properly initialized values of type `T`
+    /// - `capacity` needs to fit the layout size that the pointer was allocated with
+    pub unsafe fn from_raw_parts(ptr: *mut T, size: usize, capacity: usize,) -> Self {
+        Self {
+            data: DynamicBuffer::from_raw(unsafe { NonNull::new_unchecked(ptr) }, capacity as u32, size as u32)
         }
     }
 
-    /// Removes and returns element at `index`
-    /// - **panics** if `index > self.len() || self.is_empty()`
-    /// - does not preserve ordering of the vector
-    ///   - assigns `T::default()` to the element
-    /// - this is `O(1)` operation
-    pub fn swap_remove_ret(&mut self, index: usize) -> T {
-        if self.capacity() == 0 || index >= self.len() {
-            if self.capacity() == 0 {
-                panic!("vector has no data");
+    /// Creates a `Vec<T>` directly from a pointer, a length and a capacity
+    /// 
+    /// This is less unsafe variant of the `from_raw_parts` function, however it is not completely safe:
+    /// - `ptr` is checked to be non-null and well aligned
+    ///   - must be allocated via the `ministd::ALLOCATOR` allocator
+    ///   - with `Vec::layout_for()` or `Vec::layout_for_exact()` used for layout description
+    /// - `size` is checked to be less than or equal to `capacity`
+    /// - `capacity` needs to fit the layout size that the pointer was allocated with
+    pub unsafe fn from_raw_parts_checked(ptr: *mut T, size: usize, capacity: usize) -> Result<Self, ()> {
+        Ok(Self {
+            data: DynamicBuffer::from_raw(NonNull::new(ptr).ok_or(())?,
+            capacity as u32, if size <= capacity {
+                size as u32
             } else {
-                panic!("index out of bounds");
-            }
-        }
-
-        let ret;
-
-        unsafe {
-            let ptr = self.data.data().add(index).as_ptr();
-
-            ret = ptr.read();
-
-            ptr.write(T::default())
-        }
-
-        ret
+                return Err(())
+            })
+        })
     }
 
+    /// Creates a `Vec<T>` directly from a pointer, a length and a capacity
+    /// 
+    /// This is **highly unsafe**, due to the number of invariants that aren’t checked:
+    /// - `ptr` must be allocated via the `ministd::ALLOCATOR` allocator
+    ///   - with `Vec::layout_for()` or `Vec::layout_for_exact()` used for layout description
+    /// - `size` must be less than or equal to `capacity`
+    ///   - The first `size` values must be properly initialized values of type `T`
+    /// - `capacity` needs to fit the layout size that the pointer was allocated with
+    pub const unsafe fn from_parts(ptr: NonNull<T>, size: usize, capacity: usize) -> Self {
+        Self {
+            data: DynamicBuffer::from_raw(ptr, capacity as u32, size as u32)
+        }
+    }
+
+    /// Creates a `Vec<T>` directly from a pointer, a length and a capacity
+    /// 
+    /// This is less unsafe variant of the `from_parts` function, however it is not completely safe:
+    /// - `ptr` is checked to be non-null and well aligned
+    ///   - must be allocated via the `ministd::ALLOCATOR` allocator
+    ///   - with `Vec::layout_for()` or `Vec::layout_for_exact()` used for layout description
+    /// - `size` is checked to be less than or equal to `capacity`
+    /// - `capacity` needs to fit the layout size that the pointer was allocated with
+    pub unsafe fn from_parts_checked(ptr: NonNull<T>, size: usize, capacity: usize) -> Result<Self, ()> {
+        Ok(Self {
+            data: DynamicBuffer::from_raw(ptr, capacity as u32,
+            if size <= capacity {
+                size as u32
+            } else {
+                return Err(())
+            })
+        })
+    }
+
+    /// Decomposes a `Vec<T>` into its raw components: `(pointer, length, capacity)`
+    #[inline]
+    pub fn into_raw_parts(self) -> (*mut T, usize, usize) {
+        let m = ManuallyDrop::new(self);
+        (m.as_mut_ptr(), m.len(), m.capacity())
+    }
+
+    /// Decomposes a `Vec<T>` into its raw components: `(NonNull pointer, length, capacity)`
+    #[inline]
+    pub fn into_parts(self) -> (NonNull<T>, usize, usize) {
+        let m = ManuallyDrop::new(self);
+        (m.data.data(), m.len(), m.capacity())
+    }
+
+
+
+
+
+
+
 }
+
 
 
 impl<T: Sized, const STEP: usize> AsRef<[T]> for Vec<T, STEP> {
@@ -731,6 +1739,18 @@ impl<T: Sized, const STEP: usize> AsMut<[T]> for Vec<T, STEP> {
     /// **panics** if has no data
     fn as_mut(&mut self) -> &mut [T] {
         self.as_mut_slice().expect("Vec has no data")
+    }
+}
+
+impl<T: Sized, const STEP: usize> AsRef<Vec<T, STEP>> for Vec<T, STEP> {
+    fn as_ref(&self) -> &Vec<T, STEP> {
+        &self
+    }
+}
+
+impl<T: Sized, const STEP: usize> AsMut<Vec<T, STEP>> for Vec<T, STEP> {
+    fn as_mut(&mut self) -> &mut Vec<T, STEP> {
+        self
     }
 }
 
@@ -770,7 +1790,7 @@ impl<T: Sized, const STEP: usize> Index<usize> for Vec<T, STEP> {
         if self.len() == 0 {
             panic!("vector has no data");
         } else {
-            panic!("Vec[]: out of bounds");
+            panic_fmt!("Vec[]: index {index} is out of bounds 0..{}", self.len());
         }
     }
 }
@@ -786,7 +1806,7 @@ impl<T: Sized, const STEP: usize> IndexMut<usize> for Vec<T, STEP> {
         if self.len() == 0 {
             panic!("vector has no data");
         } else {
-            panic!("Vec[]: out of bounds");
+            panic_fmt!("Vec[]: index {index} is out of bounds 0..{}", self.len());
         }
     }
 }
@@ -867,8 +1887,258 @@ impl<T: Sized, const STEP: usize> Default for Vec<T, STEP> {
 
 impl<T: Sized, const STEP: usize> Debug for Vec<T, STEP> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        _ = writeln!(f, "Vec: ptr: {:p}, size: {}, capacity: {}", self.data.data().as_ptr(), self.data.size, self.capacity());
+        _ = writeln!(f, "Vec: ptr: {:p}, size: {}, capacity: {}",
+            self.data.data().as_ptr(), self.data.size, self.capacity());
         Ok(())
     }
 }
 
+
+
+impl<T, U, const SSTEP: usize, const OSTEP: usize>
+    PartialEq<Vec::<U, OSTEP>> for Vec<T, SSTEP>
+    where T: Sized + PartialEq<U> {
+
+    fn eq(&self, other: &Vec::<U, OSTEP>) -> bool {
+
+        match self.is_empty() as usize | ((other.is_empty() as usize) << 1) {
+            0b00 => {   //  both have any data
+                unsafe { self.as_slice_unchecked() == other.as_slice_unchecked() }
+            },
+            0b01 => {   //  only `self` has data
+                false
+            },
+            0b10 => {   //  only `other` has data
+                false
+            },
+            0b11 => {   //  `self` and `other` has no data
+                true
+            },
+            _ => unsafe {   //  only 2 bits are used
+                unreachable_unchecked()
+            }
+        }
+    }
+
+    fn ne(&self, other: &Vec::<U, OSTEP>) -> bool {
+        
+        match self.is_empty() as usize | ((other.is_empty() as usize) << 1) {
+            0b00 => {   //  both have any data
+                unsafe { self.as_slice_unchecked() != other.as_slice_unchecked() }
+            },
+            0b01 => {   //  only `self` has data
+                true
+            },
+            0b10 => {   //  only `other` has data
+                true
+            },
+            0b11 => {   //  `self` and `other` has no data
+                false
+            },
+            _ => unsafe {   //  only 2 bits are used
+                unreachable_unchecked()
+            }
+        }
+
+    }
+
+}
+
+impl<T, U, const STEP: usize> PartialEq<[U]> for Vec<T, STEP>
+    where T: Sized + PartialEq<U>, U: Sized {
+
+    fn eq(&self, other: &[U]) -> bool {
+
+        if self.len() == other.len() {
+            unsafe { self.as_slice_unchecked() == other }
+        } else {
+            false
+        }
+
+    }
+
+    fn ne(&self, other: &[U]) -> bool {
+        
+        if self.len() == other.len() {
+            unsafe { self.as_slice_unchecked() != other }
+        } else {
+            true
+        }
+
+    }
+}
+
+impl<T, U, const STEP: usize, const N: usize> PartialEq<[U; N]> for Vec<T, STEP>
+    where T: Sized + PartialEq<U>, U: Sized {
+
+    fn eq(&self, other: &[U; N]) -> bool {
+        if self.len() == N {
+            unsafe { self.as_array_unchecked::<N>() == other }
+        } else {
+            false
+        }
+    }
+
+    fn ne(&self, other: &[U; N]) -> bool {
+        if self.len() == N {
+            unsafe { self.as_array_unchecked() != other }
+        } else {
+            true
+        }
+    }
+}
+
+impl<'l, T, const STEP: usize> From<&'l [T]> for Vec<T, STEP>
+    where T: Sized + Clone {
+    fn from(value: &'l [T]) -> Self {
+
+        let mut db = DynamicBuffer::<T, STEP>::with_capacity(value.len());
+        db.size = value.len() as u32;
+
+        let mut this = db.data();
+
+        unsafe {
+            for i in value.iter() {
+                this.write(i.clone());
+
+                this = this.add(1);
+            }
+        }
+
+        Vec { data: db }
+    }
+}
+
+impl<'l, T, const STEP: usize, const N: usize> From<&'l [T; N]> for Vec<T, STEP>
+    where T: Sized + Clone {
+    fn from(value: &'l [T; N]) -> Self {
+        let mut db = DynamicBuffer::<T, STEP>::with_capacity(N);
+        db.size = N as u32;
+
+        let mut this = db.data();
+
+        unsafe {
+            for i in value.iter() {
+                this.write(i.clone());
+
+                this = this.add(1);
+            }
+        }
+
+        Vec { data: db }
+    }
+}
+
+impl<T: Sized, const STEP: usize, const N: usize> From<[T; N]> for Vec<T, STEP>
+    where T: Sized + Clone {
+    fn from(value: [T; N]) -> Self {
+        let mut db = DynamicBuffer::<T, STEP>::with_capacity(N);
+        db.size = N as u32;
+
+        let mut this = db.data();
+
+        unsafe {
+            for i in value.iter() {
+                this.write(i.clone());
+
+                this = this.add(1);
+            }
+        }
+
+        Vec { data: db }
+    }
+}
+
+impl<const STEP: usize> From<&str> for Vec<u8, STEP> {
+    fn from(value: &str) -> Self {
+
+        let mut db = DynamicBuffer::<u8, STEP>::with_capacity(value.len());
+        db.size = value.len() as u32;
+
+        unsafe {
+            copy_nonoverlapping(value.as_ptr(), db.data().as_ptr(), value.len());
+        }
+
+        Vec { data: db }
+
+    }
+}
+
+impl<T: Sized, const STEP: usize> From<Box<T>> for Vec<T, STEP> {
+    fn from(value: Box<T>) -> Self {
+        let m = ManuallyDrop::new(value);
+        Self {
+            data: DynamicBuffer::from_raw(m.as_non_null(), 1, 1)
+        }
+    }
+}
+
+impl<const STEP: usize> From<&CStr> for Vec<u8, STEP> {
+    /// Copies the string content into a Vec
+    fn from(value: &CStr) -> Self {
+        let len = value.count_bytes();
+        let mut db = DynamicBuffer::<u8, STEP>::with_capacity(len);
+        db.size = len as u32;
+
+        unsafe {
+            copy_nonoverlapping(value.as_ptr(), db.as_ptr() as *mut i8, len);
+        }
+
+        Self { data: db }
+    }
+}
+
+impl<T, const STEP: usize> Hash for Vec<T, STEP>
+    where T: Sized + Hash {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        Hash::hash_slice(self.as_slice().expect("vector is empty"), state);
+    }
+}
+
+
+
+
+
+/// Creates a `Vec` containing the arguments
+/// 
+/// usage:
+/// ```
+/// //  empty `Vec<usize>` with the `STEP` generic set to default
+/// let vec: Vec<usize> = vec!();
+///
+/// //  empty `Vec<usize>` with `STEP = 1`
+/// let vec: Vec<usize, 1> vec!(1);
+///
+/// //  `Vec<usize>` with 4 elements set to `1` and `STEP` generic set to default
+/// let vec = vec!(1usize; 4);
+///
+/// //  `Vec<usize>` with 4 elements set to `1` and `STEP = 1`
+/// let vec = vec!(1; 1usize; 4);
+/// 
+/// //  `Vec<usize>` with 4 elements set to `0`, `1`, `2` and `3` and `STEP` generic set to default
+/// let vec = vec![0usize, 1, 2, 3];
+/// 
+/// //  `Vec<usize>` with 4 elements set to `0`, `1`, `2` and `3` and `STEP = 1`
+/// let vec = vec![1; 0usize, 1, 2, 3, 4];
+/// ```
+#[macro_export]
+macro_rules! vec {
+    () => (
+        $crate::Vec::vec_new()
+    );
+    ($step:expr) => {
+        $crate::Vec::vec_new_with_step::<$step>()
+    };
+    ($elem:expr; $n:expr) => (
+        $crate::Vec::from_elem::<0>($elem, $n)
+    );
+    ($step:expr; $elem:expr; $n:expr) => {
+        $crate::Vec::from_elem::<$step>($elem, $n)
+    };
+    ($($x:expr),+ $(,)?) => (
+        $crate::Array::from([$($x),+]).into_vec::<0>()
+    );
+    [$step:expr; $($x:expr),+ $(,)?] => {
+        $crate::Array::from([$($x),+]).into_vec::<$step>()
+    }
+}

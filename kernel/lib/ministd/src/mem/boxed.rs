@@ -131,9 +131,15 @@ impl<T: Sized> Box<T> {
         self.data.as_ptr()
     }
 
+    /// Destroys the `Box` and passes reference to the data
     pub unsafe fn leak<'l>(self) -> &'l mut T {
         let mut m = ManuallyDrop::new(self);
         unsafe { m.data.as_mut() }
+    }
+
+    #[inline(always)]
+    pub const fn as_non_null(&self) -> NonNull<T> {
+        self.data
     }
 
 

@@ -13,6 +13,7 @@ use crate::TryClone;
 use core::ops::{Bound::*, Index, IndexMut, RangeBounds};
 use core::slice;
 use core::ops::{Deref, DerefMut};
+use crate::Vec;
 
 
 
@@ -319,6 +320,12 @@ impl<T: Sized> Array<T> {
         self.data.as_ptr()
     }
 
+    /// Constructs `Vec<T>` from this `Array`
+    pub fn into_vec<const STEP: usize>(self) -> Vec<T, STEP> {
+        let m = ManuallyDrop::new(self);
+        unsafe { Vec::from_parts(m.data, m.len(), m.len()) }
+    }
+
 }
 
 impl<T: Sized + Clone> Array<T> {
@@ -497,3 +504,60 @@ impl<T: Sized> IndexMut<usize> for Array<T> {
 }
 
 
+impl<'l, T> From<&'l [T]> for Array<T>
+    where T: Sized + Clone {
+    fn from(value: &'l [T]) -> Self {
+        let arr = Array::new_uninit(value.len());
+        let mut this = arr.as_ptr() as *mut T;
+
+        for i in 0..value.len() {
+            unsafe {
+                this.write(value[i].clone());
+                this = this.add(1);
+            }
+        }
+
+        unsafe {
+            Array::assume_init(arr)
+        }
+
+    }
+}
+
+impl<'l, T, const N: usize> From<&'l [T; N]> for Array<T>
+    where T: Sized + Clone {
+    fn from(value: &'l [T; N]) -> Self {
+        let arr = Array::new_uninit(N);
+        let mut this = arr.as_ptr() as *mut T;
+
+        for i in 0..N {
+            unsafe {
+                this.write(value[i].clone());
+                this = this.add(1);
+            }
+        }
+
+        unsafe {
+            Array::assume_init(arr)
+        }
+    }
+}
+
+impl<T, const N: usize> From<[T; N]> for Array<T>
+    where T: Sized + Clone {
+    fn from(value: [T; N]) -> Self {
+        let arr = Array::new_uninit(N);
+        let mut this = arr.as_ptr() as *mut T;
+
+        for i in 0..N {
+            unsafe {
+                this.write(value[i].clone());
+                this = this.add(1);
+            }
+        }
+
+        unsafe {
+            Array::assume_init(arr)
+        }
+    }
+}

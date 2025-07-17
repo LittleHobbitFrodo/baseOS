@@ -5,7 +5,6 @@
 #![no_std]
 #![no_main]
 
-
 use core::ops::Deref;
 /// # MINISTD crate
 /// This crate mimics basic functionalities of the STD crate  
@@ -29,7 +28,7 @@ pub mod init;
 //  modules
 pub use mem::string::String;
 pub use mem::boxed::Box;
-pub use mem::vec::Vec;
+pub use mem::vec::{self, Vec};
 pub use mem::array::Array;
 pub use mem::alloc::{self, ALLOCATOR, Allocator};
 pub use mem::rc::Rc;
@@ -117,6 +116,7 @@ macro_rules! panic_fmt {
     ($($arg:tt)*) => {{
 
         use core::fmt::Write;
+        use $crate::String;
 
         let mut msg: String = String::with_capacity(64);
 
