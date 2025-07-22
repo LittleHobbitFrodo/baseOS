@@ -25,7 +25,6 @@ pub trait Render {
 pub static RENDERER: spin::Mutex<Renderer> = spin::Mutex::new(Renderer::new());
 //pub static mut RENDERER: SyncCell<Renderer> = SyncCell::new(Renderer::new());
 
-
 pub struct Renderer {
     row: usize,
     line: usize,

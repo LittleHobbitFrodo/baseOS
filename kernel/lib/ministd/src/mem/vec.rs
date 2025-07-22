@@ -30,8 +30,10 @@ use crate::{panic_fmt, Box, TryClone};
 /// 1. `T`: datatype of each element
 /// 2. `STEP`: indicates how much will vector grow
 ///     - geometrical growth is used by default
-pub struct Vec<T: Sized, const STEP: usize = 0> {
-    data: DynamicBuffer<T, STEP>,
+/// 3. `ALIGN` - defines custom alignment of the data
+///     - set to 0 to use `align_of::<T>()`
+pub struct Vec<T: Sized, const STEP: usize = 0, const ALIGN: usize = 0> {
+    data: DynamicBuffer<T, STEP, ALIGN>,
 }
 
 impl<T: Sized> Vec<T> {
@@ -68,17 +70,17 @@ impl<T: Sized> Vec<T> {
 
 }
 
-impl<T: Sized, const STEP: usize> Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
     /// Describes memory layout for `Vec<T>` with certain `capacity`
     /// - is aligned to `STEP`
     pub const fn layout_for(capacity: usize) -> Layout {
-        DynamicBuffer::<T>::layout_for(capacity)
+        DynamicBuffer::<T, STEP, ALIGN>::layout_for(capacity)
     }
 
     /// Describes memory layout for some capacity without aligning to `STEP``
     pub const fn layout_for_exact(capacity: usize) -> Layout {
-        DynamicBuffer::<T>::layout_for_exact(capacity)
+        DynamicBuffer::<T, STEP, ALIGN>::layout_for_exact(capacity)
     }
 
 
@@ -386,35 +388,26 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     /// Reserves capacity for at least `additional` more elements
     /// - **panics** if allocation fails
     /// - `capacity` will be greater than or equal to `self.len() + additional` 
-    #[inline]
+    #[inline(always)]
     pub fn reserve(&mut self, additional: usize) {
-        if self.len() + additional > self.capacity() {
-            self.data.resize(self.len() + additional);
-        }
-
+        self.data.resize(self.len() + additional);
     }
 
     /// Tries to reserve capacity for at least `additional` more elements
     /// - returns `Err` if allocation fails
     /// - `capacity` will be greater than or equal to `self.len() + additional` 
-    #[inline]
+    #[inline(always)]
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), ()> {
-        if self.len() + additional > self.capacity() {
-            self.data.try_resize(self.len() + additional)
-        } else {
-            Ok(())
-        }
+        self.data.try_resize(self.len() + additional)
     }
 
     /// Reserves the minimum capacity for at least `additional` more elements
     /// - unlike `reserve`, this does not overallocate memory
     /// - **panics** if allocation fails
     /// - `capacity` will be greater than or equal to `self.len() + additional` 
-    #[inline]
+    #[inline(always)]
     pub fn reserve_exact(&mut self, additional: usize) {
-        if self.len() + additional > self.capacity() {
-            self.data.resize_exact(self.len() + additional);
-        }
+        self.data.resize_exact(self.len() + additional);
     }
 
     /// Tries to reserve the minimum capacity for at least `additional` more elements
@@ -423,11 +416,7 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     /// - `capacity` will be greater than or equal to `self.len() + additional` 
     #[inline]
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), ()> {
-        if self.len() + additional > self.capacity() {
-            self.data.try_resize_exact(self.len() + additional)
-        } else {
-            Ok(())
-        }
+        self.data.try_resize_exact(self.len() + additional)
     }
 
     /// Appends one element at the end of the vector
@@ -738,7 +727,7 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     pub fn from_slice(slice: &[T]) -> Self
         where T: Sized + Clone {
 
-        let mut db = DynamicBuffer::<T, STEP>::with_capacity(slice.len());
+        let mut db = DynamicBuffer::<T, STEP, ALIGN>::with_capacity(slice.len());
         db.size = slice.len() as u32;
 
         let mut this = db.data();
@@ -758,7 +747,7 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     pub fn try_from_slice(slice: &[T]) -> Result<Self, ()>
         where T: Sized + TryClone {
         
-        let mut db = DynamicBuffer::<T, STEP>::try_with_capacity(slice.len())?;
+        let mut db = DynamicBuffer::<T, STEP, ALIGN>::try_with_capacity(slice.len())?;
         db.size = slice.len() as u32;
 
         let mut this = db.data();
@@ -789,7 +778,7 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
     pub fn from_different_slice<'l, U>(slice: &'l [U]) -> Self
         where T: From<&'l U>, U: Sized{
 
-        let mut db = DynamicBuffer::<T, STEP>::with_capacity(slice.len());
+        let mut db = DynamicBuffer::<T, STEP, ALIGN>::with_capacity(slice.len());
         db.size = slice.len() as u32;
 
         let mut this = db.data();
@@ -1095,28 +1084,22 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
 
 
     /// Returns number of elements in the vector
-    pub const fn len(&self) -> usize {
-        self.data.size as usize
-    }
+    pub const fn len(&self) -> usize { self.data.size as usize }
 
     /// Returns number of elements allocated by the vector
-    pub const fn capacity(&self) -> usize {
-        self.data.capacity()
-    }
+    pub const fn capacity(&self) -> usize { self.data.capacity() }
 
     /// Checks whether the vector is empty (`size == 0`)
-    pub const fn is_empty(&self) -> bool {
-        self.data.size == 0
-    }
+    pub const fn is_empty(&self) -> bool { self.data.size == 0 }
 
     /// Checks if vector has any allocated data
-    pub const fn has_data(&self) -> bool {
-        self.data.has_data()
-    }
+    pub const fn has_data(&self) -> bool { self.data.has_data() }
 
-    pub const fn step(&self) -> usize {
-        STEP
-    }
+    /// Returns the value of the generic parameter `STEP` for this instance
+    pub const fn step(&self) -> usize { STEP }
+
+    /// Returns the value of the generic parameter `ALIGN` for this instance
+    pub const fn align(&self) -> usize { ALIGN }
 
 
 
@@ -1174,7 +1157,7 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
 
 }
 
-impl<T, const STEP: usize, const N: usize> Vec<[T; N], STEP> {
+impl<T, const STEP: usize, const N: usize, const ALIGN: usize> Vec<[T; N], STEP, ALIGN> {
     pub fn into_flattened(self) -> Vec<T, STEP> {
 
         let this = ManuallyDrop::new(self);
@@ -1188,7 +1171,7 @@ impl<T, const STEP: usize, const N: usize> Vec<[T; N], STEP> {
 }
 
 
-impl<T: Sized, const STEP: usize> Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
     //  Deref<[T]>
 
@@ -1706,21 +1689,30 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
 
     /// Decomposes a `Vec<T>` into its raw components: `(pointer, length, capacity)`
     #[inline]
-    pub fn into_raw_parts(self) -> (*mut T, usize, usize) {
+    pub unsafe fn into_raw_parts(self) -> (*mut T, usize, usize) {
         let m = ManuallyDrop::new(self);
         (m.as_mut_ptr(), m.len(), m.capacity())
     }
 
     /// Decomposes a `Vec<T>` into its raw components: `(NonNull pointer, length, capacity)`
     #[inline]
-    pub fn into_parts(self) -> (NonNull<T>, usize, usize) {
+    pub unsafe fn into_parts(self) -> (NonNull<T>, usize, usize) {
         let m = ManuallyDrop::new(self);
         (m.data.data(), m.len(), m.capacity())
     }
 
+    pub unsafe fn into_dynamic_buffer(self) -> DynamicBuffer<T, STEP, ALIGN> {
+        unsafe {
+            let (ptr, size, cap) = self.into_parts();
+            DynamicBuffer::from_raw(ptr, cap as u32, size as u32)
+        }
+
+    }
 
 
-
+    pub(crate) const unsafe fn from_dynamic_buffer(db: DynamicBuffer<T, STEP, ALIGN>) -> Self {
+        Self { data: db }
+    }
 
 
 
@@ -1728,47 +1720,47 @@ impl<T: Sized, const STEP: usize> Vec<T, STEP> {
 
 
 
-impl<T: Sized, const STEP: usize> AsRef<[T]> for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> AsRef<[T]> for Vec<T, STEP, ALIGN> {
     /// **panics** if has no data
     fn as_ref(&self) -> &[T] {
         self.as_slice().expect("Vec has no data")
     }
 }
 
-impl<T: Sized, const STEP: usize> AsMut<[T]> for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> AsMut<[T]> for Vec<T, STEP, ALIGN> {
     /// **panics** if has no data
     fn as_mut(&mut self) -> &mut [T] {
         self.as_mut_slice().expect("Vec has no data")
     }
 }
 
-impl<T: Sized, const STEP: usize> AsRef<Vec<T, STEP>> for Vec<T, STEP> {
-    fn as_ref(&self) -> &Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> AsRef<Vec<T, STEP, ALIGN>> for Vec<T, STEP, ALIGN> {
+    fn as_ref(&self) -> &Vec<T, STEP, ALIGN> {
         &self
     }
 }
 
-impl<T: Sized, const STEP: usize> AsMut<Vec<T, STEP>> for Vec<T, STEP> {
-    fn as_mut(&mut self) -> &mut Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> AsMut<Vec<T, STEP, ALIGN>> for Vec<T, STEP, ALIGN> {
+    fn as_mut(&mut self) -> &mut Vec<T, STEP, ALIGN> {
         self
     }
 }
 
-impl<T: Sized, const STEP: usize> Borrow<[T]> for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> Borrow<[T]> for Vec<T, STEP, ALIGN> {
     /// **panics** if has no data
     fn borrow(&self) -> &[T] {
         self.as_slice().expect("Vec has no data")
     }
 }
 
-impl<T: Sized, const STEP: usize> BorrowMut<[T]> for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> BorrowMut<[T]> for Vec<T, STEP, ALIGN> {
     /// **panics** if has no data
     fn borrow_mut(&mut self) -> &mut [T] {
         self.as_mut_slice().expect("Vec has no data")
     }
 }
 
-impl<T: Sized, const STEP: usize> Drop for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> Drop for Vec<T, STEP, ALIGN> {
     fn drop(&mut self) {
         if self.capacity() > 0 {
             unsafe {
@@ -1778,7 +1770,7 @@ impl<T: Sized, const STEP: usize> Drop for Vec<T, STEP> {
     }
 }
 
-impl<T: Sized, const STEP: usize> Index<usize> for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> Index<usize> for Vec<T, STEP, ALIGN> {
     type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
         if index < self.len() {
@@ -1795,7 +1787,7 @@ impl<T: Sized, const STEP: usize> Index<usize> for Vec<T, STEP> {
     }
 }
 
-impl<T: Sized, const STEP: usize> IndexMut<usize> for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> IndexMut<usize> for Vec<T, STEP, ALIGN> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         if index < self.len() {
             unsafe {
@@ -1811,7 +1803,7 @@ impl<T: Sized, const STEP: usize> IndexMut<usize> for Vec<T, STEP> {
     }
 }
 
-impl<T: Sized + Clone, const STEP: usize> Clone for Vec<T, STEP> {
+impl<T: Sized + Clone, const STEP: usize, const ALIGN: usize> Clone for Vec<T, STEP, ALIGN> {
     fn clone(&self) -> Self {
 
         let db = self.data.clone();

@@ -3,6 +3,7 @@
 //		an OS template on which to build
 
 #![no_std]
+
 #![no_main]
 
 use core::ops::Deref;
@@ -26,7 +27,8 @@ pub mod convert;
 pub mod init;
 
 //  modules
-pub use mem::string::String;
+pub use renderer::{RENDERER, Color};
+pub use mem::string::{self, String};
 pub use mem::boxed::Box;
 pub use mem::vec::{self, Vec};
 pub use mem::array::Array;
@@ -38,7 +40,12 @@ pub use bootloader;
 pub use limine_rs as limine;
 pub use buddy_system_allocator as allocator;
 pub use spin;
+
+//  remote crates
 pub use hashbrown;
+pub mod assert {
+    pub use static_assertions::*;
+}
 
 
 pub use spin::{Mutex, MutexGuard,

@@ -33,7 +33,7 @@ pub mod string;
 pub mod vec;
 pub mod rc;
 
-pub use dynamic_buffer::DynamicBuffer;
+pub(crate) use dynamic_buffer::DynamicBuffer;
 
 pub use crate::convert::Align;
 

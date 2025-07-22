@@ -10,3 +10,4 @@ bootloader={path="../bootloader"}
 buddy_system_allocator={path="../allocator"}
 spin={path="../spin"}
 hashbrown = "0.15.4"
+static_assertions = "1.1.0"

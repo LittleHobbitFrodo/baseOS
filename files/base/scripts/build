@@ -16,7 +16,7 @@ if [ "$#" != 0 ]; then
         case $a in
             debug)
                 debug=true
-            ;;
+                ;;
             x86_64)
                 archs="$archs x86_64"
             ;;

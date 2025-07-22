@@ -1,21 +1,50 @@
-//  mem/string.rs (ministd crate)
+//  mem/string/mod.rs (ministd crate)
 //  this file originally belonged to baseOS project
-//      on OS template on which to build
+//      an OS template on which to build
 
-use crate::mem::DynamicBuffer;
-use core::{fmt::{Debug, Display, Write}, mem::ManuallyDrop, ops::{Deref, DerefMut, Index, IndexMut, RangeBounds}, ptr::{self, copy_nonoverlapping}, slice};
+pub mod pattern;
+pub mod searcher;
+
+pub use pattern::Pattern;
+pub use searcher::{Searcher, ReverseSearcher, SearchStep};
+
+use crate::{mem::DynamicBuffer, panic_fmt, Vec};
+use core::{fmt::{Debug, Display, Write}, mem::ManuallyDrop, ops::{Deref, DerefMut, Index, IndexMut, RangeBounds}, ptr::{self, copy, copy_nonoverlapping, null_mut, NonNull}, slice, str::Utf8Error};
 use crate::convert::{strify, strify_mut};
+use core::alloc::Layout;
 
 use core::ops::Bound::*;
+
+/// Indicates alignment of the data
+const ALIGN: usize = 4;
+
+
 /// A ASCII–encoded, growable string.
 /// - this implementation will also allow you to tweak memory management using generic parameter
 /// 
 /// **note**: implementation of the `Drop` trait is not needed for the memory is deallocated by `DynamicBuffer::drop()` automatically
+///  - data in this implementation of `String` are aligned to `align_of::<u32>()` for faster copying an searching
+/// 
+/// # Generic parameter
+/// `STEP` tells the structure how many characters has to be preallocated
+/// - has to be either `0` (for geometrical growth) or multiple of 4
 pub struct String<const STEP: usize = 0> {
-    data: DynamicBuffer<u8, 0>,
+    data: DynamicBuffer<u8, STEP, ALIGN>,
 }
 
 impl<const STEP: usize> String<STEP> {
+
+    const VALID: bool = STEP == 0 || STEP.is_multiple_of(4);
+
+    /// Describes memory layout for some capacity
+    pub const fn layout_for(capacity: usize) -> Layout {
+        DynamicBuffer::<u8, STEP, ALIGN>::layout_for(capacity)
+    }
+
+    /// Describes memory layout for some capacity without aligning to STEP
+    pub const fn layout_for_exact(capacity: usize) -> Layout {
+        DynamicBuffer::<u8, STEP, ALIGN>::layout_for_exact(capacity)
+    }
 
     /// Expands the `capacity` of the vector by `STEP`
     /// - this function always reallocates memory
@@ -37,8 +66,10 @@ impl<const STEP: usize> String<STEP> {
     /// Creates a new empty `String`
     /// - no data is allocated
     pub const fn new() -> Self {
-        Self {
-            data: DynamicBuffer::empty(),
+        if Self::VALID {
+            Self { data: DynamicBuffer::empty() }
+        } else {
+            panic!("STEP has to be either `0` or multiple of 4");
         }
     }
 
@@ -46,8 +77,10 @@ impl<const STEP: usize> String<STEP> {
     /// Creates new `String` with at least the specified capacity
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            data: DynamicBuffer::with_capacity(capacity),
+        if Self::VALID {
+        Self { data: DynamicBuffer::with_capacity(capacity) }
+        } else {
+            panic!("STEP has to be either `0` or multiple of 4");
         }
     }
 
@@ -55,9 +88,59 @@ impl<const STEP: usize> String<STEP> {
     /// - returns `Err` if allocation fails
     #[inline]
     pub fn try_with_capacity(capacity: usize) -> Result<Self, ()> {
-        Ok(Self {
-            data: DynamicBuffer::try_with_capacity(capacity)?
-        })
+        if Self::VALID {
+            Ok(Self {
+                data: DynamicBuffer::try_with_capacity(capacity)?
+            })
+        } else {
+            panic!("STEP has to be either `0` or multiple of 4");
+        }
+    }
+
+    /// Converts a vector of bytes to a String
+    /// - returns `Err(None)` on allocation failure
+    pub fn from_utf8<const VSTEP: usize>(vec: Vec<u8, VSTEP>) -> Result<String<STEP>, Option<Utf8Error>> {
+
+        if Self::VALID {
+            let s = core::str::from_utf8(unsafe { vec.as_slice_unchecked() })?;
+
+            let mut db = DynamicBuffer::<u8, STEP, ALIGN>::try_with_capacity(s.len()).map_err(|_| None)?;
+            db.size = vec.len() as u32;
+
+            unsafe {
+                copy_nonoverlapping(s.as_ptr(), db.as_ptr(), s.len());
+            }
+
+            Ok(String { data: db })
+        } else {
+            panic!("STEP has to be either `0` or multiple of 4");
+        }
+    }
+
+    //  TODO: add `from_utf8_lossy`
+
+
+    /// Converts a `Vec<u8>` to a `String`, substituting invalid UTF-8 sequences with replacement characters.
+    /// Note that this function does not guarantee reuse of the original Vec allocation.
+    pub fn from_utf8_lossy_owned<const VSTEP: usize>(v: Vec<u8, STEP>) -> String<VSTEP> {
+
+        if Self::VALID {
+            let v = ManuallyDrop::new(v);
+
+            let s = unsafe { core::str::from_utf8_unchecked(v.as_slice().expect("vector is empty")) };
+
+            let mut db = DynamicBuffer::<u8, VSTEP, ALIGN>::with_capacity(s.len());
+            db.size = s.len() as u32;
+
+            unsafe {
+                copy_nonoverlapping(s.as_ptr(), db.as_ptr(), s.len());
+            }
+
+            String { data: db }
+        } else {
+            panic!("STEP has to be either `0` or multiple of 4");
+        }
+
     }
 
 
@@ -105,6 +188,28 @@ impl<const STEP: usize> String<STEP> {
         Ok(())
     }
 
+    /// Copies elements from src range to the end of the `String`
+    pub fn extend_from_within<R>(&mut self, src: R)
+        where R: RangeBounds<usize> {
+        
+        let (start, end) = self.handle_bounds(&src);
+
+        if start > self.len() || end > self.len() {
+            panic_fmt!("slice {start}..{end} is out of bounds 0..{}", self.len())
+        }
+
+        let len = end - start;
+
+        self.reserve(len);
+
+        unsafe {
+            copy(self.as_ptr().add(start), self.as_mut_ptr().add(self.len()), len);
+        }
+
+        self.data.size += len as u32;
+
+    }
+
     /// Appends the given character to the end of the `String`
     /// - **panics** if allocation fails
     pub fn push(&mut self, c: u8) {
@@ -150,14 +255,14 @@ impl<const STEP: usize> String<STEP> {
     /// Removes the last character from the `String`
     /// - does not affect `capacity`
     #[inline]
-    pub fn pop(&mut self) {
+    pub fn pop_noret(&mut self) {
         self.data.size = self.data.size.saturating_sub(1);
     }
 
     /// Removes the last character from the `String` and returns it
     /// - does not affect `capacity`
     #[inline]
-    pub fn pop_ret(&mut self) -> Option<u8> {
+    pub fn pop(&mut self) -> Option<u8> {
         if self.len() > 0 {
             self.data.size -= 1;
             Some(unsafe { self.data.as_ptr().add(self.len()).read() })
@@ -176,24 +281,64 @@ impl<const STEP: usize> String<STEP> {
 
     /// Reserves capacity for at least `add` more characters
     /// - **panics** if allocation fails
-    /// - capacity will be greater than or equal to `self.len() + add.len()`
-    #[inline]
+    /// - `capacity` will be greater than or equal to `self.len() + add`
+    ///   - `capacity` is aligned to `STEP`
+    #[inline(always)]
     pub fn reserve(&mut self, add: usize) {
-        if self.len() + add > self.capacity() {
-            self.data.resize(self.len() + add);
-        }
+        self.data.resize(self.len() + add);
     }
-
 
     /// Tries to reserve capacity for at least `add` more characters
     /// - returns `Err` if allocation fails
     /// - capacity will be greater than or equal to `self.len() + add.len()`
-    #[inline]
+    #[inline(always)]
     pub fn try_reserve(&mut self, add: usize) -> Result<(), ()> {
-        if self.len() + add > self.capacity() {
-            self.data.try_resize(self.len() + add)?;
+        self.data.try_resize(self.len() + add)
+    }
+
+    /// Reserves capacity for at least `add` more characters
+    /// - **panics** if allocation fails
+    /// - `capcity` will be greater than or equal to `self.len() + add`
+    ///   - `capacity` is not aligned
+    #[inline(always)]
+    pub fn reserve_exact(&mut self, add: usize) {
+        self.data.resize_exact(self.len() + add);
+    }
+
+    /// Reserves capacity for at least `add` more characters
+    /// - **panics** if allocation fails
+    /// - `capacity` will be greater than or equal to `self.len() + add`
+    ///   - `capacity` is not aligned
+    pub fn try_reserve_exact(&mut self, add: usize) -> Result<(), ()> {
+        self.data.try_resize_exact(self.len() + add)
+    }
+
+    /// Shortens this `String` to the specified length.
+    /// If new_len is greater than or equal to the string’s current length, this has no effect
+    #[inline]
+    pub fn truncate(&mut self, len: usize) {
+        if self.len() > len {
+            self.data.size = len as u32;
         }
-        Ok(())
+    }
+
+    /// Shortens this `String` to the specified length without checking the length of the `String`
+    /// - please use only if you are sure that `self.len() > len`
+    #[inline]
+    pub unsafe fn truncate_unchecked(&mut self, len: usize) {
+        self.data.size = len as u32;
+    }
+
+    /// Shrinks the `capacity` of this `String` to match its length
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.data.resize_exact(self.len());
+    }
+
+    /// Shrinks the `capacity` of this `String` to the specified value
+    /// The `capacity` will remain at least as large as both the length and the supplied value
+    pub fn shrink_to(&mut self, len: usize) {
+        self.data.resize_exact(core::cmp::min(self.len(), len));
     }
     
     /// Removes character at the `index` position
@@ -204,7 +349,7 @@ impl<const STEP: usize> String<STEP> {
 
         if self.len() > 0 {
             if index > self.len() {
-                panic!("index out of bounds");
+                panic_fmt!("index {index} is out of bounds 0..{}", self.len());
             }
 
             self.data.size -= 1;
@@ -215,6 +360,36 @@ impl<const STEP: usize> String<STEP> {
             }
 
         }
+    }
+
+    /// Retains only the characters specified by the predicate
+    /// 
+    /// In other words, remove all characters `c` such that `f(c)` returns `false`. This method operates in place, visiting each character exactly once in the original order, and preserves the order of the retained characters
+    /// - this is an `O(n)` operation
+    pub fn retain<F>(&mut self, f: F)
+    where F: Fn(u8) -> bool {
+
+        if self.len() == 0 {
+            return
+        }
+
+        let mut ptr = self.data.data();
+        let mut i = 0;
+
+        loop {
+
+            if !f(unsafe { ptr.read() }) {
+                self.remove(i);
+            }
+
+            if i >= self.len() {
+                return
+            }
+            
+            ptr = unsafe { ptr.add(1) };
+            i += 1;
+        }
+
     }
 
 
@@ -329,6 +504,106 @@ impl<const STEP: usize> String<STEP> {
 
     }
 
+    /// Splits the string into two at the given byte index
+    /// 
+    /// Returns a newly allocated `String`. self contains bytes `[0, at)`, and the returned `String` contains bytes `[at, len)`
+    /// 
+    /// Note that the `capacity` of `self` does not change
+    /// 
+    /// **panics** if `at` is out of bounds or allocation fails
+    pub fn split_off(&mut self, at: usize) -> String<STEP> {
+        if at >= self.len() {
+            panic_fmt!("index {at} is out of bounds 0..{}", self.len())
+        }
+
+        let len = self.len() - at;
+
+        let mut new: String<STEP> = String::with_capacity(len);
+
+        unsafe {
+            new.set_len(len);
+
+            copy_nonoverlapping(self.as_ptr().add(at), new.as_mut_ptr(), len);
+
+        }
+
+        self.data.size = at as u32;
+
+        new
+
+    }
+
+    /// Splits the string into two at the given byte index
+    /// 
+    /// Returns a newly allocated `String`. self contains bytes `[0, at)`, and the returned `String` contains bytes `[at, len)`
+    /// 
+    /// Note that the `capacity` of `self` does not change
+    /// 
+    /// **panics** if `at` is out of bounds
+    /// - returns `Err` if allocation fails
+    pub fn try_split_off(&mut self, at: usize) -> Result<String<STEP>, ()> {
+        if at >= self.len() {
+            panic_fmt!("index {at} is out of bounds 0..{}", self.len())
+        }
+
+        let len = self.len() - at;
+
+        let mut new: String<STEP> = String::try_with_capacity(len)?;
+
+        unsafe {
+            new.set_len(len);
+
+            copy_nonoverlapping(self.as_ptr().add(at), new.as_mut_ptr(), len);
+
+        }
+
+        self.data.size = at as u32;
+
+        Ok(new)
+    }
+
+    /// Removes the specified range in the string, and replaces it with the given string. The given string doesn’t need to be the same length as the range
+    pub fn replace_range<R>(&mut self, range: R, replace_with: &str)
+    where R: RangeBounds<usize> {
+
+        let (start, end) = self.handle_bounds(&range);
+
+        if start > self.len() || end > self.len() {
+            panic_fmt!("slice {start}..{end} is out of bounds 0..{}", self.len())
+        }
+
+        let len = end - start;
+
+        unsafe {
+            let mut ptr = self.data.data().add(start);
+            let bytes = replace_with.as_bytes();
+            for i in 0..len {
+
+                ptr.write(bytes[i % replace_with.len()]);
+
+                ptr = ptr.add(1);
+            }
+        }
+    }
+
+    /// Returns the byte index of the first character of this string slice that matches the pattern.
+    /// - `None` if the pattern doesn’t match
+    ///     
+    /// The `pattern` can be a `&str`, `char` (`u8`), a slice of chars, or a function or closure that determines if a character matches
+    pub fn find<P>(&self, pattern: P) -> Option<usize>
+        where P: Pattern {
+
+        P::Searcher::new(self.as_str(), pattern)
+            .next_match().map(|(start, _)| start)
+    }
+
+    
+
+    /// Forces `length` of this vector to the specified value without cheking `capacity`
+    pub unsafe fn set_len(&mut self, len: usize) {
+        self.data.size = len as u32;
+    }
+
     /// Removes all characters from the `String`
     /// - does not affect `capacity`
     pub const fn clear(&mut self) {
@@ -386,28 +661,22 @@ impl<const STEP: usize> String<STEP> {
 impl<const STEP: usize> String<STEP> {
 
     /// Returns the number of ASCII characters (bytes) of the string
-    pub const fn len(&self) -> usize {
-        self.data.size as usize
-    }
+    pub const fn len(&self) -> usize { self.data.size as usize }
 
     /// Returns the constant generic `STEP` of this instance
-    pub const fn step(&self) -> usize {
-        STEP
-    }
+    pub const fn step(&self) -> usize { STEP }
 
     /// Returns the `String`s capacity in bytes
-    pub const fn capacity(&self) -> usize {
-        self.data.capacity()
-    }
+    pub const fn capacity(&self) -> usize { self.data.capacity() }
 
 
     /// Returns a byte slice of this `String`’s contents
     /// - **panics** if empty
     pub const fn as_bytes(&self) -> &[u8] {
-        if self.data.has_data() {
+        if self.len() > 0 {
             unsafe { slice::from_raw_parts(self.data.as_ptr(), self.len()) }
         } else {
-            panic!("String has no data");
+            panic!("String is empty");
         }
     }
 
@@ -422,7 +691,7 @@ impl<const STEP: usize> String<STEP> {
     /// Returns a byte slice of this `String`’s content
     /// - returns `None` if empty
     pub const fn as_bytes_checked(&self) -> Option<&[u8]> {
-        if self.data.has_data() {
+        if self.len() > 0 {
             Some(unsafe { slice::from_raw_parts(self.data.as_ptr(), self.len()) })
         } else {
             None
@@ -432,29 +701,42 @@ impl<const STEP: usize> String<STEP> {
     /// Returns a mutable byte slice of this `String`’s contents
     /// - **panics** if empty
     pub const fn as_bytes_mut(&mut self) -> &mut [u8] {
-        if self.data.has_data() {
+        if self.len() > 0 {
             unsafe { slice::from_raw_parts_mut(self.data.as_ptr(), self.len()) }
         } else {
-            panic!("String has no data");
+            panic!("String is empty");
         }
     }
 
-    /// Returns a mutable byte slice of this `String`’s content without checking for NULL
-    /// - **safety** - even if the `String` does not contain any data, the pointer is valid
-    ///   - misuse may cause undefined behavoiur
-    ///   - use only if you are 100% sure that the string contains value
-    pub const unsafe fn as_bytes_mut_unchecked(&self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self.data.as_ptr(), self.len()) }
-    }
-
-    /// Returns a mutable byte slice of this `String`’s content
-    /// - returns `None` if empty
-    pub const fn as_bytes_mut_checked(&self) -> Option<&mut [u8]> {
-        if self.data.has_data() {
-            Some(unsafe { slice::from_raw_parts_mut(self.data.as_ptr(), self.len()) })
+    /// Returns content of the `String` as slice or `None` if the `String` is empty
+    pub fn as_slice(&self) -> Option<&[u8]> {
+        if self.len() > 0 {
+            Some(unsafe { slice::from_raw_parts(self.as_ptr(), self.len()) })
         } else {
             None
         }
+    }
+
+    /// Returns content of the `String` as slice without checking if the `String` is empty
+    /// - please use only if you are sure that the `String` is not empty
+    #[inline]
+    pub unsafe fn as_slice_unchecked(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.as_ptr(), self.len()) }
+    }
+
+    /// Returns content of the `String` as mutable slice or `None` if the `String` is empty
+    pub fn as_mut_slice(&mut self) -> Option<&mut [u8]> {
+        if self.len() > 0 {
+            Some(unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) })
+        } else {
+            None
+        }
+    }
+
+    /// Returns content of the `String` as slice without checking if the `String` is empty
+    /// - please use only if you are ure that the `String` is not empty
+    pub fn as_mut_slice_unchecked(&mut self) -> &mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) }
     }
 
 
@@ -464,7 +746,7 @@ impl<const STEP: usize> String<STEP> {
         if self.data.has_data() {
             strify(unsafe { slice::from_raw_parts(self.data.as_ptr(), self.data.size as usize) })
         } else {
-            panic!("String has no data");
+            panic!("String is empty");
         }
     }
 
@@ -492,7 +774,7 @@ impl<const STEP: usize> String<STEP> {
         if self.data.has_data() {
             strify_mut(unsafe { slice::from_raw_parts_mut(self.data.data().as_ptr(), self.data.size as usize) })
         } else {
-            panic!("String has no data");
+            panic!("String is empty");
         }
     }
 
@@ -521,6 +803,37 @@ impl<const STEP: usize> String<STEP> {
     }
 
 
+    /// Decomposes a String into its raw components: `(pointer, length, capacity)`
+    /// 
+    /// After calling this function, the caller is responsible for the memory previously managed by the `String`
+    /// - you can deallocate the memory with `String::layout_for_exact(capacity)` used as layout
+    /// - or reconstruct the string with `from_raw_parts`
+    pub unsafe fn into_raw_parts(self) -> (*mut u8, usize, usize) {
+        let mut m = ManuallyDrop::new(self);
+        if m.len() > 0 {
+            (m.as_mut_ptr(), m.len(), m.capacity())
+        } else {
+            (null_mut(), m.len(), m.capacity())
+        }
+    }
+
+    /// Creates a new String from a pointer, a length and a capacity
+    /// 
+    /// Safety:
+    /// - data must be obtained (and not modified) from `String::into_raw_parts`
+    /// - or allocated with `String::layout_for_exact(capacity)`
+    pub const unsafe fn from_raw_parts(ptr: *mut u8, len: usize, capacity: usize) -> Self {
+        Self {
+            data: DynamicBuffer::from_raw(NonNull::new(ptr).expect("pointer is null"), capacity as u32, len as u32)
+        }
+    }
+
+    /// Converts String into `Vec<u8>`
+    pub fn into_bytes(self) -> Vec<u8, STEP> {
+        let (data, size, capacity) = unsafe { self.data.into_parts() };
+        unsafe { Vec::from_parts(data, size, capacity) }
+    }
+
     /// Checks `RangeBounds` for this vector
     #[inline]
     fn handle_bounds<R>(&self, range: &R) -> (usize, usize)
@@ -540,11 +853,11 @@ impl<const STEP: usize> String<STEP> {
 
     #[inline(always)]
     pub fn iter<'l>(&'l self) -> core::slice::Iter<'l, u8> {
-        self.as_bytes_checked().expect("String is empty").into_iter()
+        self.as_slice().expect("String is empty").into_iter()
     }
 
     pub fn iter_mut<'l>(&'l mut self) -> core::slice::IterMut<'l, u8> {
-        self.as_bytes_mut_checked().expect("String is empty").into_iter()
+        self.as_mut_slice().expect("String is empty").into_iter()
     }
 
 

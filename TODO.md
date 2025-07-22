@@ -14,5 +14,8 @@ Yes, this is my todolist. Take a look if interested.
 
 ## Rust
 
+- Add the `Cow` type
+
 ### Ministd
 - Add support for aarch64
+

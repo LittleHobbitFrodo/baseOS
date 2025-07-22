@@ -5,7 +5,9 @@
 
 //  this file provides simple [`Color`] structure to use with the renderer
 
-use core::fmt::Display;
+use core::{fmt::Display, time::Duration};
+
+use spin::MutexGuard;
 
 use crate::renderer::{Render, RENDERER};
 
@@ -22,7 +24,13 @@ union Col {
     int: u32,
 }
 
-#[derive(Copy, Clone)]
+impl core::fmt::Debug for Col {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        unsafe { write!(f, "rgb({}, {}, {})", self.rgb.r, self.rgb.g, self.rgb.b) }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 pub struct Color {
     value: Col
 }
@@ -44,6 +52,26 @@ impl Color {
     pub fn set_rgb(&mut self, val: Rgb) {
         self.value.rgb = val;
     }
+
+    /// Tries to lock the renderer and set `self` as the color of the `RENDERER`
+    /// - returns `false` if fails
+    #[inline]
+    pub fn set(&self) -> bool {
+        match super::RENDERER.try_lock() {
+            Some(mut guard) => {
+                guard.set_color(self.as_int());
+                true
+            },
+            None => false,
+        }
+    }
+
+    /// Sets `self` as the color of the renderer behind the `guard`
+    #[inline(always)]
+    pub fn set_locked(&self, guard: &mut MutexGuard<super::renderer::Renderer>) {
+        guard.set_color(self.as_int());
+    }
+
 }
 
 
@@ -86,4 +114,3 @@ impl Color {
     }
 
 }
-

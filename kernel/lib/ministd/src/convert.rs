@@ -66,12 +66,12 @@ impl Align for *const u8 {
 }
 
 
-/// converts `&[u8]` to [`&str`]
+/// converts `&[u8]` to `&str` with no runtime overhead
 pub const fn strify(s: &[u8]) -> &str {
     unsafe { core::str::from_utf8_unchecked(s) }
 }
 
-/// converts `&mut [u8]` to `&mut str`
+/// converts `&mut [u8]` to `&mut str` with no runtime overhead
 pub const fn strify_mut(s: &mut [u8]) -> &mut str {
     unsafe { core::str::from_utf8_unchecked_mut(s) }
 }
