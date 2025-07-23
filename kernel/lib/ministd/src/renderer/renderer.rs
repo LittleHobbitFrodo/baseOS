@@ -2,6 +2,7 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
+use limine_rs::framebuffer::Framebuffer;
 use limine_rs as limine;
 use spin::MutexGuard;
 use crate::renderer::font;
@@ -17,15 +18,77 @@ pub const SPACE_BETWEEN_LINES: u16 = 3;
 /// - classic [`core::fmt::Display`] should be prefered
 pub trait Render {
     fn render(&self);
-    fn render_locked<'l>(&self, guard: &'l mut MutexGuard<Renderer>);
+    fn render_locked<'l>(&self, guard: &'l mut MutexGuard<DefaultRenderer>);
+}
+
+/// Unifying the API for the Renderer and how should it work
+/// 
+/// all functions that renders something does not return any value
+/// - if framebuffer is missing, passes the data to `TODO` function
+pub trait Renderer: Render + Send + core::fmt::Write {
+
+    /// Constructs new `Renderer`
+    /// - may not work for it has not been initializes
+    fn new() -> Self;
+
+    /// Initializes the renderer and makes it work
+    /// - returns `Err` if failes
+    fn init(&mut self, fb: &limine::request::FramebufferRequest) -> Result<(), ()>;
+
+    /// Returns the current horizontal position of the cursor
+    /// - left to right
+    fn column(&self) -> usize;
+
+    /// Returns the current vertical position of the cursor
+    /// - up to bottom
+    fn line(&self) -> usize;
+
+    /// Returns the position of the cursor as `(x, y)`
+    fn position(&self) -> (usize, usize);
+
+    /// Returns reference to raw framebuffer
+    fn fb(&self) -> &FrameBuffer;
+
+    /// Clears the display (sets all pixels to default background colors)
+    fn clear(&mut self);
+
+    /// Sets the vertical position of the cursor to the specified value
+    /// - returns `Err` if `line` is out of bounds of the framebuffer
+    fn set_line(&mut self, line: usize) -> Result<(), ()>;
+
+    /// Sets the horizontal position of the cursor to the specified value
+    fn set_column(&mut self, column: usize) -> Result<(), ()>;
+
+    /// Sets horizontal and verical position of the cursor
+    /// - returns `Err` if `line` or `row` is out of bounds of the framebuffer
+    fn set_pos(&mut self, line: usize, row: usize) -> Result<(), ()>;
+
+    /// Renders one character at the cursor position while moving the cursor to right
+    /// - potentionally moves the cursor one line below
+    /// - alignes the cursor to `TAB_SIZE` constant on tab character
+    fn render(&mut self, c: u8);
+
+    /// Renders the string at the cursor position
+    fn print(&mut self, str: &[u8]);
+
+    /// Renders the string at the cursor position and breaks the line
+    fn println(&mut self, str: &[u8]);
+
+    /// Breaks the line
+    fn endl(&mut self);
+
+    /// Prints the tab character (aligns the horizontal position of the cursor to the `TAB_SIZE` constant)
+    fn tab(&mut self);
+
+
 }
 
 
 //pub static mut RENDERER: Renderer = Renderer::new();
-pub static RENDERER: spin::Mutex<Renderer> = spin::Mutex::new(Renderer::new());
+pub static RENDERER: spin::Mutex<DefaultRenderer> = spin::Mutex::new(DefaultRenderer::new());
 //pub static mut RENDERER: SyncCell<Renderer> = SyncCell::new(Renderer::new());
 
-pub struct Renderer {
+pub struct DefaultRenderer {
     row: usize,
     line: usize,
     fb: FrameBuffer,
@@ -34,10 +97,10 @@ pub struct Renderer {
     initialized: bool,
 }
 
-unsafe impl Sync for Renderer {}
-unsafe impl Send for Renderer {}
+//unsafe impl Sync for DefaultRenderer {}
+unsafe impl Send for DefaultRenderer {}
 
-impl Renderer {
+impl DefaultRenderer {
     pub const fn new() -> Self {
         Self {
             row: 0,
@@ -168,16 +231,16 @@ impl Renderer {
     }
 }
 
-impl AsRef<Renderer> for Renderer {
+impl AsRef<DefaultRenderer> for DefaultRenderer {
     #[inline(always)]
-    fn as_ref(&self) -> &Renderer {
+    fn as_ref(&self) -> &DefaultRenderer {
         &self
     }
 }
 
-impl AsMut<Renderer> for Renderer {
+impl AsMut<DefaultRenderer> for DefaultRenderer {
     #[inline(always)]
-    fn as_mut(&mut self) -> &mut Renderer {
+    fn as_mut(&mut self) -> &mut DefaultRenderer {
         self
     }
 }
@@ -187,6 +250,7 @@ pub struct FrameBuffer {
     height: usize,
     address: *mut Color,
     bpp: usize,
+    initialized: bool
 }
 
 impl FrameBuffer {
@@ -196,6 +260,7 @@ impl FrameBuffer {
             height: 0,
             address: core::ptr::null_mut(),
             bpp: 0,
+            initialized: false
         }
     }
     pub fn init(&mut self, fb: &limine::request::FramebufferRequest) -> Result<(), ()> {
@@ -205,6 +270,7 @@ impl FrameBuffer {
                 self.width = framebuffer.width() as usize;
                 self.height = framebuffer.height() as usize;
                 self.address = framebuffer.addr() as *mut Color;
+                self.initialized = true;
                 Ok(())
             } else {
                 Err(())
@@ -213,6 +279,7 @@ impl FrameBuffer {
             Err(())
         }
     }
+
     pub fn width(&self) -> usize { self.width }
     pub fn height(&self) -> usize { self.height }
     pub fn bpp(&self) -> usize { self.bpp }
@@ -221,6 +288,26 @@ impl FrameBuffer {
     }
 }
 
+/*impl TryFrom<limine::request::FramebufferRequest> for FrameBuffer {
+    type Error = ();
+    fn try_from(value: limine::request::FramebufferRequest) -> Result<Self, ()> {
+        if let Some(r) = value.get_response() {
+            if let Some(fb) = r.framebuffers().nth(0) {
+                Self {
+                    width: fb.width(),
+                    height: fb.height(),
+
+                }
+            } else {
+                Err(())
+            }
+        } else {
+            Err(())
+        }
+        
+    }
+}*/
+
 
 #[inline(always)]
 pub fn init() -> Result<(), ()> {
@@ -228,7 +315,7 @@ pub fn init() -> Result<(), ()> {
 }
 
 
-impl core::fmt::Write for Renderer {
+impl core::fmt::Write for DefaultRenderer {
     #[inline]
     fn write_char(&mut self, c: char) -> core::fmt::Result {
         self.render(c as u8);
@@ -243,7 +330,7 @@ impl core::fmt::Write for Renderer {
 
 }
 
-impl Renderer {
+impl DefaultRenderer {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.print(s.as_bytes());
         Ok(())

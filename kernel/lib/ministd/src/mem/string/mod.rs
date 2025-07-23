@@ -8,7 +8,13 @@ pub mod searcher;
 pub use pattern::Pattern;
 pub use searcher::{Searcher, ReverseSearcher, SearchStep};
 
-use crate::{mem::DynamicBuffer, panic_fmt, Vec};
+use crate::mem::DynamicBuffer;
+
+#[cfg(all(feature="allocator", feature="spin", feature="spin", feature="string"))]
+use crate::panic_fmt;
+#[cfg(all(feature="allocator", feature="spin", feature="vector"))]
+use crate::Vec;
+
 use core::{fmt::{Debug, Display, Write}, mem::ManuallyDrop, ops::{Deref, DerefMut, Index, IndexMut, RangeBounds}, ptr::{self, copy, copy_nonoverlapping, null_mut, NonNull}, slice, str::Utf8Error};
 use crate::convert::{strify, strify_mut};
 use core::alloc::Layout;
@@ -99,6 +105,7 @@ impl<const STEP: usize> String<STEP> {
 
     /// Converts a vector of bytes to a String
     /// - returns `Err(None)` on allocation failure
+    #[cfg(all(feature="allocator", feature="vector"))]
     pub fn from_utf8<const VSTEP: usize>(vec: Vec<u8, VSTEP>) -> Result<String<STEP>, Option<Utf8Error>> {
 
         if Self::VALID {
@@ -122,6 +129,7 @@ impl<const STEP: usize> String<STEP> {
 
     /// Converts a `Vec<u8>` to a `String`, substituting invalid UTF-8 sequences with replacement characters.
     /// Note that this function does not guarantee reuse of the original Vec allocation.
+    #[cfg(all(feature="allocator", feature="vector"))]
     pub fn from_utf8_lossy_owned<const VSTEP: usize>(v: Vec<u8, STEP>) -> String<VSTEP> {
 
         if Self::VALID {
@@ -195,7 +203,10 @@ impl<const STEP: usize> String<STEP> {
         let (start, end) = self.handle_bounds(&src);
 
         if start > self.len() || end > self.len() {
-            panic_fmt!("slice {start}..{end} is out of bounds 0..{}", self.len())
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
+            panic_fmt!("slice {start}..{end} is out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("slice is out of bounds");
         }
 
         let len = end - start;
@@ -349,7 +360,10 @@ impl<const STEP: usize> String<STEP> {
 
         if self.len() > 0 {
             if index > self.len() {
+                #[cfg(all(feature="allocator", feature="spin", feature="string"))]
                 panic_fmt!("index {index} is out of bounds 0..{}", self.len());
+                #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+                panic!("index is out of bounds");
             }
 
             self.data.size -= 1;
@@ -513,7 +527,11 @@ impl<const STEP: usize> String<STEP> {
     /// **panics** if `at` is out of bounds or allocation fails
     pub fn split_off(&mut self, at: usize) -> String<STEP> {
         if at >= self.len() {
-            panic_fmt!("index {at} is out of bounds 0..{}", self.len())
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
+            panic_fmt!("index {at} is out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("index is out of bounds");
+            
         }
 
         let len = self.len() - at;
@@ -543,7 +561,10 @@ impl<const STEP: usize> String<STEP> {
     /// - returns `Err` if allocation fails
     pub fn try_split_off(&mut self, at: usize) -> Result<String<STEP>, ()> {
         if at >= self.len() {
-            panic_fmt!("index {at} is out of bounds 0..{}", self.len())
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
+            panic_fmt!("index {at} is out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("index is out of bounds");
         }
 
         let len = self.len() - at;
@@ -569,7 +590,10 @@ impl<const STEP: usize> String<STEP> {
         let (start, end) = self.handle_bounds(&range);
 
         if start > self.len() || end > self.len() {
-            panic_fmt!("slice {start}..{end} is out of bounds 0..{}", self.len())
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
+            panic_fmt!("slice {start}..{end} is out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("index is out of bounds");
         }
 
         let len = end - start;
@@ -829,6 +853,7 @@ impl<const STEP: usize> String<STEP> {
     }
 
     /// Converts String into `Vec<u8>`
+    #[cfg(all(feature="allocator", feature="vector"))]
     pub fn into_bytes(self) -> Vec<u8, STEP> {
         let (data, size, capacity) = unsafe { self.data.into_parts() };
         unsafe { Vec::from_parts(data, size, capacity) }

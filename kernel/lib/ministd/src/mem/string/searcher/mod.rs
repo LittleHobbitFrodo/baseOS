@@ -5,7 +5,7 @@
 mod searchers;
 pub use searchers::{CharSearcher, StrSearcher, CharPredicateSearcher};
 
-use crate::string::Pattern;
+use super::Pattern;
 
 /// Indicates the status of last searching operation
 #[derive(Clone, PartialEq)]

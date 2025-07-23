@@ -20,6 +20,7 @@ pub use core::pin::Pin;
 
 //  used modules
 pub mod mem;
+#[cfg(feature = "renderer")]
 pub mod renderer;
 #[macro_use]
 pub mod io;
@@ -27,31 +28,47 @@ pub mod convert;
 pub mod init;
 
 //  modules
+#[cfg(feature="renderer")]
 pub use renderer::{RENDERER, Color};
+
+#[cfg(all(feature="string", feature="allocator", feature="spin"))]
 pub use mem::string::{self, String};
-pub use mem::boxed::Box;
+
+#[cfg(all(feature="vector", feature="allocator", feature="spin"))]
 pub use mem::vec::{self, Vec};
+
+#[cfg(all(feature="box", feature="allocator", feature="spin"))]
+pub use mem::boxed::Box;
+#[cfg(all(feature="box", feature="allocator", feature="spin"))]
 pub use mem::array::Array;
+
+#[cfg(all(feature="allocator", feature="spin"))]
 pub use mem::alloc::{self, ALLOCATOR, Allocator};
+
+#[cfg(all(feature="rc", feature="allocator", feature="spin"))]
 pub use mem::rc::Rc;
 
 //  local crates
 pub use bootloader;
 pub use limine_rs as limine;
+#[cfg(all(feature="allocator", feature="spin"))]
 pub use buddy_system_allocator as allocator;
+#[cfg(feature="spin")]
 pub use spin;
 
 //  remote crates
+#[cfg(all(feature="allocator", feature="spin", feature="hashmap"))]
 pub use hashbrown;
 pub mod assert {
     pub use static_assertions::*;
 }
 
-
+#[cfg(feature="spin")]
 pub use spin::{Mutex, MutexGuard,
     RwLock, RwLockReadGuard, RwLockWriteGuard, RwLockUpgradableGuard,
     Lazy, Barrier, Once};
 
+#[cfg(all(feature="hashmap", feature="allocator", feature="spin"))]
 pub use hashbrown::{HashMap, HashSet, HashTable};
 
 use core::arch::asm;
@@ -114,10 +131,11 @@ impl<T: Sized> Deref for Immutable<T> {
     }
 }
 
-
+#[cfg(all(feature="allocator", feature="spin", feature="string"))]
 pub static PANIC_FMT_MSG: RwLock<Option<&'static str>> = RwLock::new(None);
 
 /// Makes support for formatted panic messages possible
+#[cfg(all(feature="allocator", feature="spin", feature="string"))]
 #[macro_export]
 macro_rules! panic_fmt {
     ($($arg:tt)*) => {{

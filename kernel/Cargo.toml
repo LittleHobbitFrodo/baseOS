@@ -33,5 +33,5 @@ panic="abort"
 ministd={path="lib/ministd"}
 limine_rs={path="lib/limine"}
 bootloader={path="lib/bootloader"}
-buddy_system_allocator={path="lib/allocator"}
+#buddy_system_allocator={path="lib/allocator"}
 

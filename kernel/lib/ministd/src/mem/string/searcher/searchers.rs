@@ -2,7 +2,7 @@
 //  this file originally belonged to baseOS project
 //      an OS template on which to build
 
-use crate::string::{ReverseSearcher, SearchStep, Searcher};
+use super::{ReverseSearcher, SearchStep, Searcher};
 
 use super::{find_from, rfind_from};
 
@@ -191,7 +191,7 @@ pub struct StrSearcher<'haystack, 'needle> {
     haystack: &'haystack [u8],
     needle: &'needle [u8],
     finger: u32,
-    finger_back: u32,
+    //finger_back: u32,
     next_match: bool,   //  next iteration will match
 }
 
@@ -201,17 +201,19 @@ impl<'haystack,'needle > Searcher<'haystack, &'needle str> for StrSearcher<'hays
     
     #[inline]
     fn new(haystack: &'haystack str, needle: &'needle str) -> Self {
-        let (finger, back) = if haystack.len() == 0 || needle.len() == 0 || haystack.len() < needle.len() {
+        /*let (finger, back) = if haystack.len() == 0 || needle.len() == 0 || haystack.len() < needle.len() {
             //  errorous input -> searching functions will return `Done`
-            ((haystack.len() - needle.len() - 1) as u32, 0)
+            (haystack.len() as u32, 0)
         } else {
-            (0, (haystack.len() - needle.len() - 1) as u32)
-        };
+            (0, haystack.len() as u32)
+        };*/
+        let finger = (haystack.len() * ( haystack.len() == 0 || needle.len() == 0
+            || haystack.len() < needle.len()) as usize) as u32;
         Self {
             haystack: haystack.as_bytes(),
             needle: needle.as_bytes(),
             finger: finger,
-            finger_back: back,
+            //finger_back: back,
             next_match: false,
         }
     }
@@ -326,127 +328,87 @@ impl<'haystack,'needle > Searcher<'haystack, &'needle str> for StrSearcher<'hays
 }
 
 
-impl<'haystack,'needle> ReverseSearcher<'haystack, &'needle str> for StrSearcher<'haystack, 'needle> {
-
-
-    fn next_back(&mut self) -> SearchStep {
-
-        let start = self.finger_back as usize;
-
-        let max = self.haystack.len() - self.needle.len();
-
-        if self.next_match {
-            self.next_match = false;
-            self.finger -= 1;
-            return if start == 0 {
-                SearchStep::LastMatch(0, self.needle.len())
-            } else {
-                SearchStep::Match(start, start + self.needle.len())
-            }
-        } else if start == 0 {
-            return SearchStep::Done
-        }
-
-        let first = self.needle[0];
-        let slice = &self.haystack[..max];
-
-        while let Some(index) = rfind_from(first, slice, self.finger_back as usize) {
-            let last_index = index + self.needle.len();
-            if &self.haystack[index..last_index] == self.needle {
-                return if index != start {
-                    self.finger_back = index as u32;
-                    self.next_match = true;
-                    SearchStep::Reject(last_index, start)
-                } else {
-                    if index == 0 {
-                        self.finger_back = 0;
-                        SearchStep::LastMatch(0, self.needle.len())
-                    } else {
-                        self.finger_back = (index - 1) as u32;
-                        SearchStep::Match(last_index, start)
-                    }
-                }
-            } else {
-                self.finger_back -= 1;
-                continue
-            }
-        }
-
-        SearchStep::LastReject(0, start)
-
-
-        /*let start = self.finger as usize;
-
-        if start >= self.haystack.len() {
-            return SearchStep::Done
-        }
-
-        let max = self.haystack.len() - self.needle.len();
-
-        if self.next_match {
-            self.next_match = false;
-            self.finger += self.needle.len() as u32;
-            if start >= max {
-                return SearchStep::LastMatch(start, self.finger as usize)
-            } else {
-                return SearchStep::Match(start, self.finger as usize)
-            }
-        }
-
-        let first = self.needle[0];
-        let slice = &self.haystack[..max + 1];
-
-        while let Some(index) = find_from(first, slice, self.finger as usize) {
-            let last_index = index + self.needle.len();
-            if &self.haystack[index..last_index] == self.needle {
-                if index != start {
-                    self.finger = index as u32;
-                    self.next_match = true;
-                    return SearchStep::Reject(start, index)
-                } else {
-                    return if index >= max {
-                        self.finger = self.haystack.len() as u32;
-                        SearchStep::LastMatch(start, self.haystack.len())   
-                    } else {
-                        self.finger = last_index as u32;
-                        SearchStep::Match(start, last_index)
-                    }
-                }
-            } else {
-                self.finger = (index + 1) as u32;
-                continue;
-            }
-        }
-
-        //  no more matching characters
-        SearchStep::LastReject(start, self.haystack.len())*/
-
-
-
-    }
-
-    fn next_match_back(&mut self) -> Option<(usize, usize)> {
-        None
-    }
-
-    fn next_reject_back(&mut self) -> Option<(usize, usize)> {
-        None
-    }
-
-}
 
 
 
 
-
-
-
-
-pub struct CharPredicateSearcher<'haystack, 'needle, F>
+pub struct CharPredicateSearcher<'haystack, F>
 where F: FnMut(u8) -> bool {
     haystack: &'haystack [u8],
-    needle: &'needle [u8],
     predicate: F,
     finger: u32,
-    finger_back: u32
+    finger_back: u32,
+    next_match: bool,
 }
+
+impl<'haystack, F> Searcher<'haystack, F> for CharPredicateSearcher<'haystack, F>
+where F: FnMut(u8) -> bool + Clone {
+
+    type Needle = F;
+    
+    fn new(haystack: &'haystack str, needle: F) -> Self {
+        Self {
+            haystack: haystack.as_bytes(),
+            predicate: needle.clone(),
+            finger: 0,
+            finger_back: (haystack.len() - 1) as u32,
+            next_match: false,
+        }
+    }
+
+    fn haystack(&self) -> &str { crate::convert::strify(self.haystack) }
+
+    fn next(&mut self) -> SearchStep {
+
+        let start = self.finger as usize;
+
+        if self.next_match {
+            self.next_match = false;
+            self.finger += 1;
+            return SearchStep::Match(start, self.finger as usize)
+        } else if self.finger as usize >= self.haystack.len() {
+            return SearchStep::Done
+        }
+
+        let slice = &self.haystack[self.finger as usize..];
+
+        for (i, item) in slice.iter().enumerate() {
+            if (self.predicate)(*item) {
+                self.next_match = true;
+                self.finger = (start + i) as u32;
+                return SearchStep::Reject(start, self.finger as usize)
+            }
+        }
+
+        self.finger = self.haystack.len() as u32;
+        SearchStep::LastReject(start, self.haystack.len())
+
+
+    }
+
+    fn next_match(&mut self) -> Option<(usize, usize)> {
+
+        let start = self.finger as usize;
+
+        if self.finger as usize >= self.haystack.len() {
+            return None
+        }
+
+        let slice = &self.haystack[self.finger as usize..];
+
+        for (i, item) in slice.iter().enumerate() {
+            if (self.predicate)(*item) {
+                self.finger = (start + i) as u32;
+                return Some((self.finger as usize, (self.finger + 1) as usize))
+            }
+        }
+
+        None
+    }
+
+    fn next_reject(&mut self) -> Option<(usize, usize)> {
+        None
+    }
+
+} 
+

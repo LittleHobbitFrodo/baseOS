@@ -6,10 +6,9 @@
 
 #![no_std]
 
-
-
 //  you can read more about the bootloader here:
 //  - Limine github repo: https://github.com/limine-bootloader/limine.git
+
 
 
 

@@ -13,6 +13,8 @@ use crate::TryClone;
 use core::ops::{Bound::*, Index, IndexMut, RangeBounds};
 use core::slice;
 use core::ops::{Deref, DerefMut};
+
+#[cfg(all(feature="allocator", feature="vector"))]
 use crate::Vec;
 
 
@@ -321,6 +323,7 @@ impl<T: Sized> Array<T> {
     }
 
     /// Constructs `Vec<T>` from this `Array`
+    #[cfg(all(feature="allocator", feature="vector"))]
     pub fn into_vec<const STEP: usize>(self) -> Vec<T, STEP> {
         let m = ManuallyDrop::new(self);
         unsafe { Vec::from_parts(m.data, m.len(), m.len()) }

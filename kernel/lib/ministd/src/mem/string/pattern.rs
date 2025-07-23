@@ -6,7 +6,7 @@
 
 use core::{hash::Hash, mem::ManuallyDrop};
 
-use crate::string::{searcher::{CharSearcher, StrSearcher}, ReverseSearcher, Searcher};
+use super::{searcher::{CharPredicateSearcher, CharSearcher, StrSearcher}, ReverseSearcher, Searcher};
 
 pub trait Pattern: Sized {
     type Searcher<'l>: Searcher<'l, Self>;
@@ -88,7 +88,34 @@ impl<'n> Pattern for &'n str {
 
 }
 
-/*impl<'n, F> Pattern for F
-where F: FnMut(u8) -> bool {
-    
-}*/
+impl<F> Pattern for F
+where F: FnMut(u8) -> bool, F: Clone {
+
+    type Searcher<'hay> = CharPredicateSearcher<'hay, Self>;
+
+    #[inline]
+    fn searcher<'l>(&self, haystack: &'l str) -> Self::Searcher<'l> {
+        Self::Searcher::new(haystack, self.clone())
+    }
+
+    fn is_contained_in(&self, haystack: &str) -> bool {
+        Self::Searcher::new(haystack, self.clone()).next_match().is_some()
+    }
+
+    fn is_prefix_of(&self, haystack: &str) -> bool {
+        match Self::Searcher::new(haystack, self.clone()).next_match() {
+            Some((start, _)) => start == 0,
+            None => false,
+        }
+    }
+
+    fn is_suffix_of<'a>(&self, haystack: &'a str) -> bool
+        where Self::Searcher<'a>: ReverseSearcher<'a, Self> {
+        match Self::Searcher::new(haystack, self.clone()).next_match_back() {
+            Some((_, end)) => end == haystack.len(),
+            None => false,
+        }
+    }
+
+
+}

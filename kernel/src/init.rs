@@ -7,12 +7,31 @@
 use ministd::mem::string::searcher::{StrSearcher, SearchStep};
 use ministd::mem::string::Searcher;
 use ministd::renderer::RENDERER;
+use ministd::string::searcher::CharPredicateSearcher;
 use ministd::string::ReverseSearcher;
 use ministd::{dbg, io, locked_eprintln, panic_fmt, Color, Rc};
 use ministd::{println, print, locked_print, locked_println, eprintln, init};
 use ministd::{Box, Array, Vec, String, HashMap, vec};
 
 use crate::manage::*;
+
+/// This is the kernel entry point, the point that is called by the `ministd` library after boot
+/// 
+/// Feel free to change the behaviour of this function, but do not change its definition
+/// 
+/// Note that the entry point can be changed via the `bootloader` crate
+/// - use the `EntryPointRequest` structure
+#[unsafe(no_mangle)]
+extern "C" fn _start() -> ! {
+
+    io::int::disable();
+
+    if let Err(_) = init() {
+        panic!("failed to initialize the kernel");
+    }
+
+    ministd::hang();
+}
 
 /// This function is here to initialize your kernel
 /// 
@@ -33,42 +52,35 @@ fn init() -> Result<(), ()> {
 
     println!("hello world!");
 
-    let arr = &[
-        ("The quick brown fox jumps over the lazy dog", "fox"),
-        ("The quick brown fox", "cat"),
-        ("match this string", "match"),
-        ("end with this", "this"),
-        ("aaaabaaaab", "aaab"),
-        ("abababab", "ab"),
-        ("hello world!", "hello world!")
+    /*let f = |x: u8| x == b'f';
+
+
+    let arr = [
+        ("The quick brown fox jumps over the lazy dog"),
+        ("The quick brown fox"),
+        ("match this string"),
+        ("end with this"),
+        ("aaaabaaaab"),
+        ("abababab"),
+        ("fhello world!")
     ];
 
+    let x = "";
+
     for i in arr.iter() {
-        check_searcher(i.0, i.1);
-    }
+        check_searcher(i, x, f);
+    }*/
 
     Ok(())
 
 }
 
-/// This is the first function that is called by the bootloader
-/// 
-/// Make sure to put your initialization function here :)
-#[unsafe(no_mangle)]
-extern "C" fn _start() {
+/*
+fn check_searcher<'h, 'n, F>(haystack: &'h str, needle: &'n str, predicate: F)
+where F: FnMut(u8) -> bool + Clone {
 
-    io::int::disable();
-
-    if let Err(_) = init() {
-        panic!("failed to initialize the kernel");
-    }
-
-    ministd::hang();
-}
-
-fn check_searcher<'h, 'n>(haystack: &'h str, needle: &'n str) {
-
-    let mut s = StrSearcher::new(haystack, needle);
+    //let mut s = StrSearcher::new(haystack, needle);
+    let mut s = CharPredicateSearcher::new(haystack, predicate);
 
     //RENDERER.lock().set_color(0x99ff99);
     let mut rend = ministd::RENDERER.lock();
@@ -84,7 +96,7 @@ fn check_searcher<'h, 'n>(haystack: &'h str, needle: &'n str) {
     let mut result: SearchStep;
     for _ in 0..4 {
 
-        result = s.next_back();
+        result = s.next();
 
         match result {
             SearchStep::Match(start, end) => {
@@ -127,4 +139,4 @@ fn check_searcher<'h, 'n>(haystack: &'h str, needle: &'n str) {
 
 const GREEN: u32 = 0x88ff88;
 const RED: u32 = 0xff8888;
-const WHITE: u32 = 0xffffff;
+const WHITE: u32 = 0xffffff;*/

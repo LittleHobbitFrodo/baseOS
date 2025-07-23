@@ -9,6 +9,7 @@
 
 use core::arch::asm;
 
+#[cfg(feature="renderer")]
 #[macro_use]
 pub mod text;
 

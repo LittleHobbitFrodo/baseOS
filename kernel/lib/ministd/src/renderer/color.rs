@@ -68,7 +68,7 @@ impl Color {
 
     /// Sets `self` as the color of the renderer behind the `guard`
     #[inline(always)]
-    pub fn set_locked(&self, guard: &mut MutexGuard<super::renderer::Renderer>) {
+    pub fn set_locked(&self, guard: &mut MutexGuard<super::renderer::DefaultRenderer>) {
         guard.set_color(self.as_int());
     }
 

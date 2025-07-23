@@ -19,7 +19,6 @@ name = "baseOS"
 version = "0.1.0"
 dependencies = [
  "bootloader",
- "buddy_system_allocator",
  "limine_rs",
  "ministd",
 ]

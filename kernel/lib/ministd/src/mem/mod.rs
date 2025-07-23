@@ -24,15 +24,24 @@ pub use core::mem::needs_drop;
 
 pub mod readonly;
 pub use readonly::ReadOnly;
+#[cfg(all(feature="allocator", feature="spin"))]
 pub mod alloc;
+
+#[cfg(all(feature="box", feature="allocator", feature="spin"))]
 pub mod boxed;
+#[cfg(all(feature="box", feature="allocator", feature="spin"))]
 pub mod array;
+#[cfg(all(feature="allocator", feature="spin"))]
 pub mod dynamic_buffer;
 
+#[cfg(all(feature="string", feature="allocator", feature="spin"))]
 pub mod string;
+#[cfg(all(feature="vector", feature="allocator", feature="spin"))]
 pub mod vec;
+#[cfg(all(feature="rc", feature="allocator", feature="spin"))]
 pub mod rc;
 
+#[cfg(all(feature="allocator", feature="spin"))]
 pub(crate) use dynamic_buffer::DynamicBuffer;
 
 pub use crate::convert::Align;

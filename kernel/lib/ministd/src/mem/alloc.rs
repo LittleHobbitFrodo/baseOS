@@ -15,7 +15,6 @@
 /// otherwise it could break things
 //pub const ALLOC_ALIGN: usize = 4;
 
-
 pub use buddy_system_allocator as allocator;
 use spin::MutexGuard;
 use core::alloc::GlobalAlloc;
@@ -23,6 +22,7 @@ pub use core::alloc::Layout;
 use core::mem::MaybeUninit;
 use core::ptr::{copy_nonoverlapping, drop_in_place, null_mut, NonNull};
 use crate::mem::*;
+
 use crate::spin::Mutex;
 use crate::Immutable;
 

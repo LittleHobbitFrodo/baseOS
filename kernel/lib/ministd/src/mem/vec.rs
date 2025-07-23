@@ -11,12 +11,18 @@ use core::hash::Hash;
 use core::hint::unreachable_unchecked;
 use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ptr::{copy_nonoverlapping, drop_in_place, NonNull};
-use core::slice::{self, from_raw_parts, from_raw_parts_mut, Chunks, ChunksExact, ChunksExactMut, ChunksMut, Windows};
+use core::slice::{self, from_raw_parts, from_raw_parts_mut};
 use core::ops::{Bound::*, Deref, DerefMut, Index, IndexMut, Range, RangeBounds};
 use core::cmp::Ordering::*;
 
 use crate::mem::DynamicBuffer;
-use crate::{panic_fmt, Box, TryClone};
+use crate::{TryClone};
+
+#[cfg(all(feature="allocator", feature="spin", feature="box"))]
+use crate::Box;
+
+#[cfg(all(feature="allocator", feature="spin", feature="string"))]
+use crate::panic_fmt;
 
 
 
@@ -326,7 +332,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
         let (start, end) = self.handle_bounds(&src);
 
         if start > self.len() || end > self.len() {
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
             panic_fmt!("slice {start}..{end} is out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("slice is out of bounds");
         }
 
         let len = end - start;
@@ -359,7 +368,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
         let (start, end) = self.handle_bounds(&src);
 
         if start > self.len() || end > self.len() {
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
             panic_fmt!("slice {start}..{end} is out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("slice is out of bounds");
         }
 
         let len = end - start;
@@ -558,7 +570,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
     pub fn remove_drop(&mut self, index: usize) {
         if self.capacity() > 0 {
             if index >= self.len() {
+                #[cfg(all(feature="allocator", feature="spin", feature="string"))]
                 panic_fmt!("index {index} out of bounds 0..{}", self.len());
+                #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+                panic!("index is out of bounds");
             }
 
             unsafe {
@@ -587,7 +602,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
     pub fn remove(&mut self, index: usize) -> T {
         if self.capacity() > 0 {
             if index >= self.len() {
+                #[cfg(all(feature="allocator", feature="spin", feature="string"))]
                 panic_fmt!("index {index} out of bounds 0..{}", self.len());
+                #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+                panic!("index is out of bounds");
             }
 
             let ret;
@@ -621,7 +639,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
         let len = self.len();
 
         if index > len {
-            panic_fmt!("index {index} is out of bounds 0..{len}");
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
+            panic_fmt!("index {index} out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("index is out of bounds");
         } else if index == len {
             self.push(val);
             return;
@@ -964,7 +985,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
         } else {
             if index >= self.len() {
+                #[cfg(all(feature="allocator", feature="spin", feature="string"))]
                 panic_fmt!("index {index} is out of bounds 0..{}", self.len());
+                #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+                panic!("index is out of bounds");
             } else {
                 panic!("calling `Vec::swap_remove` on vector with length equal to 1 could end up with undefined behaviour");
             }
@@ -1009,7 +1033,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
                 e.write(T::default());
             }
         } else {
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
             panic_fmt!("index {index} is out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("index is out of bounds");
         }
     }
 
@@ -1536,11 +1563,19 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
         if a >= self.len() || b >= self.len() {
             //  give user an ide where is problem
             let check = (a >= self.len()) as usize | ((b >= self.len()) as usize) << 1;
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
             match check {
                 0b01 => panic_fmt!("argument a = {a} is out of bounds [0..{}]", self.len()),
                 0b10 => panic_fmt!("argument b = {b} is out of bounds [0..{}]", self.len()),
                 0b11 => panic_fmt!("arguments a = {a} and b = {b} are out of bounds [0..{}]", self.len()),
                 _ => unsafe { unreachable_unchecked()},
+            }
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            match check {
+                0b01 => panic!("argument a is out of bounds"),
+                0b10 => panic!("argument b is out of bounds"),
+                0b11 => panic!("arguments a and b are out of bounds"),
+                _ => unsafe { unreachable_unchecked() }
             }
         }
         if a == b { return } 
@@ -1701,7 +1736,7 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
         (m.data.data(), m.len(), m.capacity())
     }
 
-    pub unsafe fn into_dynamic_buffer(self) -> DynamicBuffer<T, STEP, ALIGN> {
+    pub(crate) unsafe fn into_dynamic_buffer(self) -> DynamicBuffer<T, STEP, ALIGN> {
         unsafe {
             let (ptr, size, cap) = self.into_parts();
             DynamicBuffer::from_raw(ptr, cap as u32, size as u32)
@@ -1782,7 +1817,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Index<usize> for Vec<T, ST
         if self.len() == 0 {
             panic!("vector has no data");
         } else {
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
             panic_fmt!("Vec[]: index {index} is out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("Vec[]: index is out of bounds");
         }
     }
 }
@@ -1798,7 +1836,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> IndexMut<usize> for Vec<T,
         if self.len() == 0 {
             panic!("vector has no data");
         } else {
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
             panic_fmt!("Vec[]: index {index} is out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("Vec[]: index is out of bounds");
         }
     }
 }
@@ -2055,7 +2096,7 @@ impl<const STEP: usize> From<&str> for Vec<u8, STEP> {
 
     }
 }
-
+#[cfg(all(feature="allocator", feature="spin", feature="box"))]
 impl<T: Sized, const STEP: usize> From<Box<T>> for Vec<T, STEP> {
     fn from(value: Box<T>) -> Self {
         let m = ManuallyDrop::new(value);
