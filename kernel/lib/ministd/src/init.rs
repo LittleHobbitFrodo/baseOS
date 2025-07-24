@@ -21,3 +21,4 @@ pub fn allocator() -> Result<(), Option<&'static str>> {
 pub fn renderer() -> Result<(), ()> {
     renderer::init()
 }
+

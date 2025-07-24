@@ -55,6 +55,9 @@ pub use limine_rs as limine;
 pub use buddy_system_allocator as allocator;
 #[cfg(feature="spin")]
 pub use spin;
+use proc_macro;
+
+pub use proc_macro::{entry, oom};
 
 //  remote crates
 #[cfg(all(feature="allocator", feature="spin", feature="hashmap"))]
@@ -75,6 +78,9 @@ use core::arch::asm;
 use core::hint::spin_loop;
 pub use core::convert::{Infallible, From, TryFrom, Into, TryInto};
 
+
+
+pub type HeapRef<'l> = crate::MutexGuard<'l, crate::alloc::Heap>;
 
 pub fn hang() -> ! {
     loop {

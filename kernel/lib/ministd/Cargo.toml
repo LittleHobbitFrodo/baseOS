@@ -11,6 +11,7 @@ spin={ path="spin" }
 buddy_system_allocator={ path="allocator" }
 hashbrown = "0.15.4"
 static_assertions = "1.1.0"
+proc_macro={ path="proc_macro" }
 
 [features]
 default=["all"]

@@ -179,7 +179,7 @@ unsafe impl GlobalAlloc for Allocator {
                 //  run out_of_memory routine and try again
                 
                 let mut alloc = HEAP.lock();
-                if let Ok(_) = unsafe { out_of_memory_handler(&mut alloc, &self) }{
+                if let Ok(_) = unsafe { __oom_handler(&mut alloc, &self) }{
                     match alloc.alloc(layout) {
                         Ok(data) => data.as_ptr(),
                         Err(_) => null_mut(),
@@ -254,8 +254,9 @@ unsafe extern "Rust" {
 
     //  functions defined by the developer in the main crate
 
-     pub(crate) fn find_heap_region() -> Result<Region<PAGE_ALIGN>, Option<&'static str>>;
-     pub(crate) fn out_of_memory_handler(heap: &mut MutexGuard<Heap>, allocator: &Allocator) -> Result<(), ()>;
+    pub(crate) fn find_heap_region() -> Result<Region<PAGE_ALIGN>, Option<&'static str>>;
+    //pub(crate) fn out_of_memory_handler(heap: &mut MutexGuard<Heap>, allocator: &Allocator) -> Result<(), ()>;
+    pub(crate) fn __oom_handler(heap: &mut crate::HeapRef, alloc: &crate::Allocator) -> Result<(), ()>;
 }
 
 

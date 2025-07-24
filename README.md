@@ -32,8 +32,8 @@ A UNIX-based operating system is required to use the project. You can use Linux,
 Please note that some development **dependencies** must be **built from source** on certain platforms. If your operating system is not listed above, it does not mean that it is not supported.
 
 # Supported Target Platforms
-- [X] x86_64
-- [ ] arm64
+- [x] x86_64
+- [ ] aarch64
 
 # Supported Programming Languages
 - [X] Rust (75% of the work is done, testing is required)
@@ -51,10 +51,10 @@ Please note that some development **dependencies** must be **built from source**
 - **Qemu** - emulator to test the OS on
 
 # Lets get started!
-1. To initialize the project, simply clone the base branch
+1. To initialize the project, simply clone the repository
     - `git clone https://github.com/LittleHobbitFrodo/BaseOS.git`
 2. Choose your target platform and programming language
-3. Configuring the project using the `util` tool
+3. Configure the project using the `util` tool
     - `./util conf <arch>`
       - for example `./util conf x86_64`
 4. You can also download development dependencies
@@ -65,6 +65,7 @@ Please note that some development **dependencies** must be **built from source**
 
 
 # Roadmap
+
 ### Base
 - Util
   - [X] Project Info
@@ -89,7 +90,7 @@ Please note that some development **dependencies** must be **built from source**
   - [X] Box - `Array` is used for allocation of arrays
   - [X] Vector
   - [X] HashMap - using `hashbrown` from the std
-  - [ ] Rc
+  - [x] Rc
   - [ ] Arc
 
 #### Maybes

@@ -4,33 +4,38 @@
 
 //  module for kernel initialization
 
-use ministd::mem::string::searcher::{StrSearcher, SearchStep};
+/*use ministd::mem::string::searcher::{StrSearcher, SearchStep};
 use ministd::mem::string::Searcher;
 use ministd::renderer::RENDERER;
 use ministd::string::searcher::CharPredicateSearcher;
 use ministd::string::ReverseSearcher;
 use ministd::{dbg, io, locked_eprintln, panic_fmt, Color, Rc};
 use ministd::{println, print, locked_print, locked_println, eprintln, init};
-use ministd::{Box, Array, Vec, String, HashMap, vec};
+use ministd::{Box, Array, Vec, String, HashMap, vec};*/
 
-use crate::manage::*;
+//use crate::manage::*;
+
+use ministd::entry;
+use ministd::init;
+use ministd::{panic_fmt, print, println};
+
 
 /// This is the kernel entry point, the point that is called by the `ministd` library after boot
 /// 
-/// Feel free to change the behaviour of this function, but do not change its definition
+/// Feel free to change the behaviour of this function
+/// - the function needs to have the `#[ministd::init]` attribute and must **never** return (`-> !`)
 /// 
 /// Note that the entry point can be changed via the `bootloader` crate
 /// - use the `EntryPointRequest` structure
-#[unsafe(no_mangle)]
-extern "C" fn _start() -> ! {
-
-    io::int::disable();
+#[entry]
+pub fn kernel_entry() -> ! {
 
     if let Err(_) = init() {
-        panic!("failed to initialize the kernel");
+        panic!("failed to initialize kernel");
     }
 
     ministd::hang();
+
 }
 
 /// This function is here to initialize your kernel
