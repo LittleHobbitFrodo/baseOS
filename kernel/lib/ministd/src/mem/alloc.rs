@@ -254,7 +254,7 @@ unsafe extern "Rust" {
 
     //  functions defined by the developer in the main crate
 
-    pub(crate) fn find_heap_region() -> Result<Region<PAGE_ALIGN>, Option<&'static str>>;
+    pub(crate) fn __region_finder() -> Result<Region, Option<&'static str>>;
     //pub(crate) fn out_of_memory_handler(heap: &mut MutexGuard<Heap>, allocator: &Allocator) -> Result<(), ()>;
     pub(crate) fn __oom_handler(heap: &mut crate::HeapRef, alloc: &crate::Allocator) -> Result<(), ()>;
 }
@@ -275,7 +275,7 @@ unsafe extern "Rust" {
 /// - please do not change it
 pub(crate) fn init() -> Result<(), Option<&'static str>> {
 
-    let reg = unsafe { find_heap_region() }?;
+    let reg = unsafe { __region_finder() }?;
 
     *REGIONS.lock() = reg;
 

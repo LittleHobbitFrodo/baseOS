@@ -57,7 +57,7 @@ pub use buddy_system_allocator as allocator;
 pub use spin;
 use proc_macro;
 
-pub use proc_macro::{entry, oom};
+pub use proc_macro::{entry, oom, region_finder};
 
 //  remote crates
 #[cfg(all(feature="allocator", feature="spin", feature="hashmap"))]

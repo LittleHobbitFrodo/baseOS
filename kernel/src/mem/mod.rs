@@ -6,7 +6,7 @@ use ministd::{alloc::*, mem::Region, MutexGuard};
 use bootloader::{MEMMAP, HHDM};
 use limine_rs::memory_map::EntryType;
 use ministd::mem::{MB, PAGE_ALIGN};
-use ministd::oom;
+use ministd::{oom, region_finder};
 
 /// `mem::find_heap_region` function is used by the `ministd::init::allocator()` to find suitable place in the memory for heap
 /// - returns `ministd::mem::Region` structure that stores
@@ -24,9 +24,8 @@ use ministd::oom;
 /// 
 /// Feel free to change the behaviour of this function, but do not modify the declaration
 /// 
-#[unsafe(no_mangle)]
-extern "Rust" fn find_heap_region() -> Result<ministd::mem::Region<PAGE_ALIGN>, Option<&'static str>> {
-
+#[region_finder]
+fn find_heap_region() -> Result<ministd::mem::Region, Option<&'static str>> {
     //  The default behaviour of the function finds valid `usable` MEMMAP entry big enough that is covered by HHDM
     //  - you can change the HHDM request revision in the `bootloader` crate
     //      - make sure that theis function works correctly with the revision
@@ -54,9 +53,7 @@ extern "Rust" fn find_heap_region() -> Result<ministd::mem::Region<PAGE_ALIGN>, 
     }
 
     Err(Some("did not found place for heap"))
-
 }
-
 
 
 /// This function is called by the allocator whenever it fails to allocate memory
@@ -67,7 +64,7 @@ extern "Rust" fn find_heap_region() -> Result<ministd::mem::Region<PAGE_ALIGN>, 
 /// Feel free to change the behaviour of the function
 /// - but keep in ming that it has to have the `#[oom]` attribute
 /// 
-/// The `#[oom` macro should catch all mistakes in the signature
+/// The `#[oom]` macro should catch all mistakes in the signature
 /// - but you never know: `fn <name>(&mut ministd::HeapRef, &ministd::Allocator) -> Result<(), ()>`
 #[oom]
 fn out_of_memory(heap: &mut ministd::HeapRef, alloc: &ministd::Allocator) -> Result<(), ()> {
