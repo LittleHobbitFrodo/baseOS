@@ -7,9 +7,9 @@
 
 use core::{fmt::Display, time::Duration};
 
-use spin::MutexGuard;
+use crate::{MinistdRenderer, Mutex, MutexGuard};
 
-use crate::renderer::{Render, RENDERER};
+
 
 #[derive(Copy, Clone)]
 pub struct Rgb {
@@ -56,8 +56,9 @@ impl Color {
     /// Tries to lock the renderer and set `self` as the color of the `RENDERER`
     /// - returns `false` if fails
     #[inline]
-    pub fn set(&self) -> bool {
-        match super::RENDERER.try_lock() {
+    pub fn set<R>(&self, renderer: &Mutex<R>) -> bool
+    where R: crate::MinistdRenderer {
+        match renderer.try_lock() {
             Some(mut guard) => {
                 guard.set_color(self.as_int());
                 true
@@ -68,7 +69,8 @@ impl Color {
 
     /// Sets `self` as the color of the renderer behind the `guard`
     #[inline(always)]
-    pub fn set_locked(&self, guard: &mut MutexGuard<super::renderer::DefaultRenderer>) {
+    pub fn set_locked<R>(&self, guard: &mut MutexGuard<R>)
+    where R: MinistdRenderer {
         guard.set_color(self.as_int());
     }
 

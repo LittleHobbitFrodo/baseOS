@@ -2,10 +2,7 @@
 
 source "$PWD/files/base/scripts.conf"
 
-limine_path="$PWD/bootloader"
 iso="$PWD/iso"
-kernel_path="$PWD/files"
-image_path="$PWD/files"
 
 function failure() {
     status="$?"
@@ -41,7 +38,6 @@ fi
 
 IFS=" "
 for a in $archs; do
-    limine="$PWD/bootloader/limine/limine-$(uname)-$(uname -m)"
 
     note "creating ISO for $a target"
 
@@ -58,13 +54,13 @@ for a in $archs; do
     cp $(kernel_full $a) $iso/boot/baseOS.bin
 
     if [ $debug == true ]; then
-        limine_config="$limine_path/configs/limine-debug.conf"
+        limine_config="$LIMINE_PATH/configs/limine-debug.conf"
     else
-        limine_config="$limine_path/configs/limine.conf"
+        limine_config="$LIMINE_PATH/configs/limine.conf"
     fi
 
 
-    cp $limine_config $limine_path/limine-bios.sys $iso/boot/limine
+    cp $limine_config $LIMINE_PATH/limine-bios.sys $iso/boot/limine
 
     case $a in
         x86_64)
@@ -77,9 +73,9 @@ for a in $archs; do
     esac
 
     echo "efi exe: $efi_exe"
-    cp $limine_path/$efi_exe $iso/EFI/BOOT/
+    cp $LIMINE_PATH/$efi_exe $iso/EFI/BOOT/
 
-    cp $limine_path/limine-bios-cd.bin $limine_path/limine-uefi-cd.bin $iso/
+    cp $LIMINE_PATH/limine-bios-cd.bin $LIMINE_PATH/limine-uefi-cd.bin $iso/
 
 
     xorriso -as mkisofs -R -r -J -b limine-bios-cd.bin\
@@ -87,6 +83,6 @@ for a in $archs; do
 	--efi-boot limine-uefi-cd.bin -efi-boot-part --efi-boot-image\
 	--protective-msdos-label $iso -o "$(image_full $a)"
 
-    $limine bios-install $(image_full $a)
+    $LIMINE_CMDLINE bios-install $(image_full $a)
 
 done

@@ -7,7 +7,8 @@
 
 #[cfg(all(feature="allocator", feature="spin"))]
 use crate::mem::alloc;
-use crate::renderer;
+#[cfg(feature = "renderer")]
+use ::renderer::MinistdRenderer;
 
 /// initializes allocator
 #[cfg(all(feature="allocator", feature="spin"))]
@@ -19,6 +20,6 @@ pub fn allocator() -> Result<(), Option<&'static str>> {
 #[cfg(feature="renderer")]
 #[inline]
 pub fn renderer() -> Result<(), ()> {
-    renderer::init()
+    crate::RENDERER.lock().init(&bootloader::FRAMEBUFFER)
 }
 

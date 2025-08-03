@@ -1,19 +1,16 @@
-//	renderer/mod.rs (ministd crate)
-//	this file originally belonged to baseOS project
-//		an OS template on which to build
-
-//  this file is used as target in the util script
 pub mod font;
 
-#[macro_use]
-pub mod color;
-pub use color::Color;
+use crate::Mutex;
+extern crate renderer;
+pub use renderer::{MinistdRenderer, RendererStatus, Color};
 
 
-pub mod renderer;
-pub use renderer::RENDERER;
-pub use renderer::Render;
+#[cfg(feature = "default-renderer")]
+pub mod default_renderer;
+#[cfg(feature = "default-renderer")]
+pub use default_renderer::Renderer;
 
-pub(crate) fn init() -> Result<(), ()> {
-    renderer::init()
-}
+#[cfg(not(feature = "default-renderer"))]
+pub use renderer::Renderer;
+
+pub static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());

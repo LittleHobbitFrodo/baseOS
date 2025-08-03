@@ -38,6 +38,7 @@ use crate::panic_fmt;
 ///     - geometrical growth is used by default
 /// 3. `ALIGN` - defines custom alignment of the data
 ///     - set to 0 to use `align_of::<T>()`
+#[repr(transparent)]
 pub struct Vec<T: Sized, const STEP: usize = 0, const ALIGN: usize = 0> {
     data: DynamicBuffer<T, STEP, ALIGN>,
 }

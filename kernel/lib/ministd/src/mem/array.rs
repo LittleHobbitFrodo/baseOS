@@ -24,6 +24,7 @@ pub const fn uninit<T: Sized, const LEN: usize>() -> [T; LEN] {
 }
 
 /// Array is Box-like structure used to allocate arrays
+#[repr(C)]
 pub struct Array<T: Sized> {
     data: NonNull<T>,
     size: usize,

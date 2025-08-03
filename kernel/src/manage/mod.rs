@@ -5,11 +5,12 @@
 
 use ministd::{renderer::{RENDERER}, RwLock, hang};
 use core::panic::{PanicInfo};
-use ministd::{locked_print, locked_println};
 use ministd::convert::strify;
+use ministd::{print, println};
 
 pub mod kernel_state;
 pub use kernel_state::*;
+use ministd::renderer::MinistdRenderer;
 
 
 
@@ -44,31 +45,32 @@ pub fn panic_handler(info: &PanicInfo) -> ! {
 
     rend.set_color(0xff0000);
 
-    locked_println!(rend, "PANIC occured at {}:{}:{}", location.file(), location.line(), location.column());
+    println!(rend: "PANIC occured at {}:{}:{}", location.file(), location.line(), location.column());
 
     match state {
         KernelState::Init(i) => {
-            locked_println!(rend, "while initializing {}", strify(i.as_str()) );
+            println!(rend: "while initializing {}", strify(i.as_str()) );
         },
         KernelState::Runtime(r) => {
-            locked_println!(rend, "at runtime task {}", strify(r.as_str()));
+            println!(rend: "at runtime task {}", strify(r.as_str()));
         },
         KernelState::Shutdown(s) => {
-            locked_println!(rend, "at shutdown task {}", strify(s.as_str()));
+            println!(rend: "at shutdown task {}", strify(s.as_str()));
         },
         KernelState::Panic => {
-            locked_println!(rend, "already in panic");
+            println!(rend: "already in panic");
         },
     }
 
     match msg {
         Some(m) => {
-            locked_print!(rend, "error message: ");
+            print!(rend: "error message: ");
             rend.set_color(0xffffff);
-            rend.println(m.as_bytes());
+            println!(rend: "{}", m);
         },
-        None => locked_println!(rend, "No error message given!"),
+        None => println!(rend: "No error message given!"),
     }
 
     hang();
 }
+

@@ -34,6 +34,7 @@ const ALIGN: usize = 4;
 /// # Generic parameter
 /// `STEP` tells the structure how many characters has to be preallocated
 /// - has to be either `0` (for geometrical growth) or multiple of 4
+#[repr(transparent)]
 pub struct String<const STEP: usize = 0> {
     data: DynamicBuffer<u8, STEP, ALIGN>,
 }

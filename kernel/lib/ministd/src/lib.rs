@@ -3,7 +3,6 @@
 //		an OS template on which to build
 
 #![no_std]
-
 #![no_main]
 
 use core::ops::Deref;
@@ -22,10 +21,14 @@ pub use core::pin::Pin;
 pub mod mem;
 #[cfg(feature = "renderer")]
 pub mod renderer;
-#[macro_use]
 pub mod io;
 pub mod convert;
 pub mod init;
+
+
+#[macro_use]
+pub(crate) mod tests;
+pub use tests::Test;
 
 //  modules
 #[cfg(feature="renderer")]
@@ -57,10 +60,10 @@ pub use buddy_system_allocator as allocator;
 pub use spin;
 use proc_macro;
 
-pub use proc_macro::{entry, oom, region_finder};
+pub use proc_macro::{entry, oom, region_finder, testing, test_only};
 
 //  remote crates
-#[cfg(all(feature="allocator", feature="spin", feature="hashmap"))]
+#[cfg(all(feature="allocator", feature="hashmap"))]
 pub use hashbrown;
 pub mod assert {
     pub use static_assertions::*;
@@ -79,9 +82,11 @@ use core::hint::spin_loop;
 pub use core::convert::{Infallible, From, TryFrom, Into, TryInto};
 
 
+#[cfg(feature = "allocator")]
+pub type HeapRef<'l> = spin::MutexGuard<'l, crate::alloc::Heap>;
 
-pub type HeapRef<'l> = crate::MutexGuard<'l, crate::alloc::Heap>;
 
+/// disables interrupts and halts the CPU
 pub fn hang() -> ! {
     loop {
         io::int::disable();

@@ -1,4 +1,4 @@
-#![no_std]
+//#![no_std]
 
 use proc_macro::*;
 
@@ -7,10 +7,10 @@ use quote::{TokenStreamExt, quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::token::Pound;
 use syn::{
-    parse_macro_input, parse_quote, parse_quote_spanned, Attribute, Error, Expr, ExprLit, ExprPath, FnArg, ItemFn, ItemStruct, Lit, Path, ReturnType, Type, Visibility
+    parse_macro_input, parse_quote, parse_quote_spanned, Attribute, Error, Expr, ExprLit, ExprPath, FnArg, Item, ItemFn, ItemStatic, ItemStruct, Lit, Path, ReturnType, Type, Visibility
 };
 use syn::{PatType, TypeReference, TypePath, Signature, GenericArgument};
-
+use syn::{ExprMacro, visit_mut::{self, VisitMut}, Stmt};
 
 
 const EXPECTED_FN_ARGS: ([&'static str; 2], [&'static str; 2]) = (["ministd", "HeapRef"], ["ministd", "Allocator"]);
@@ -27,6 +27,8 @@ pub fn entry(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     let mut f = parse_macro_input!(input as ItemFn);
 
+    f.attrs.clear();
+
     check_signature(&f.sig);
 
     check_return_type(&f.sig.output);
@@ -40,10 +42,41 @@ pub fn entry(attr: TokenStream, input: TokenStream) -> TokenStream {
         name: Some(syn::LitStr::new("C", proc_macro2::Span::call_site())),
     });
 
-    f.attrs.push(parse_quote!(#[unsafe(no_mangle)]));
-    f.attrs.push(parse_quote!(#[unsafe(export_name = "_start")]));
+    //f.attrs.push(parse_quote!(#[unsafe(no_mangle)]));
+    //f.attrs.push(parse_quote!(#[unsafe(export_name = "_start")]));
 
-    return quote!(#f).into();
+    //return quote!(#f).into();
+
+    let generated = quote! {
+
+        //  ("testing" and "custom_testing") or not "testing"
+        #[cfg(any(
+            not(feature = "testing"),
+            all(feature = "testing", feature = "custom_testing")
+        ))]
+        #[unsafe(no_mangle)]
+        #[unsafe(export_name = "_start")]
+        #f
+
+        #[cfg(all(feature = "testing", not(feature = "custom_testing")))]
+        #[unsafe(no_mangle)]
+        extern "C" fn _start() -> ! {
+
+            unsafe extern "Rust" {
+                fn __run_tests_with(test_name: Option<&'static str>, clear: bool);
+            }
+
+            let _ = ministd::init::renderer().expect("FAILED TO INITIALIZE RENDERER");
+
+            let _ = ministd::init::allocator().expect("FAILED TO INITIALIZE ALLOCATOR");
+            
+            unsafe { __run_tests_with(None, true) }
+            ministd::hang();
+        }
+
+    }.into();
+
+    return generated;
 
 
 
@@ -463,5 +496,218 @@ pub fn region_finder(_: TokenStream, input: TokenStream) -> TokenStream {
 
     }
 
+
+}
+
+
+#[proc_macro_attribute]
+pub fn testing(attr: TokenStream, input: TokenStream) -> TokenStream {
+
+    let test_name = if attr.is_empty() {
+        None
+    } else {
+        let a = attr.into_iter().nth(0).expect("failed to get attribte");
+
+        let s = a.span().source_text().expect("failed to get test name");
+        Some(s.leak::<'static>())
+    };
+
+    let mut f = parse_macro_input!(input as ItemFn);
+
+    check_signature(&f.sig);
+
+    //  make it `extern "Rust"`
+    f.sig.abi = Some(syn::Abi {
+        extern_token: Default::default(),
+        name: Some(syn::LitStr::new("Rust", proc_macro2::Span::call_site())),
+    });
+
+    //  make it return `Result<(), ()>`
+    f.sig.output = ReturnType::Type(
+        syn::token::RArrow::default(),
+        Box::new(syn::parse_quote!(Result<(), Option<&'static str>>)),
+    );
+
+    //  add custom macros to the function
+    f.block.stmts.insert(0, syn::parse_quote! {
+        macro_rules! fail {
+            () => { return Err(None); };
+            ($msg:literal) => { return Err(Some($msg)); };
+        }
+    });
+
+    f.block.stmts.insert(0, syn::parse_quote! {
+        macro_rules! success {
+            () => { return Ok(()); }
+        }
+    });
+
+    f.block.stmts.insert(0, syn::parse_quote! {
+        macro_rules! __test_assert {
+            ($e:expr) => {
+                if !($e) {
+                    return Err(Some(stringify!(assertion $e failed)));
+                } 
+            };
+            ($e:expr, $msg:literal) => {
+                if !($e) {
+                    return Err(Some(stringify!(assertion $e failed: $msg)));
+                }
+            };
+        }
+    });
+
+    f.block.stmts.insert(0, syn::parse_quote! {
+        macro_rules! __test_assert_eq {
+            ($left:expr, $right:expr) => {
+                if ($left) != ($right) {
+                    return Err(Some(stringify!(assertion $left == $right failed)));
+                }
+            };
+            ($left:expr, $right:expr, $msg:literal) => {
+                if ($left) != ($right) {
+                    return Err(Some(stringify!(assertion $left == $right failed: $msg)));
+                }
+            }
+        }
+    });
+
+    f.block.stmts.insert(0, syn::parse_quote! {
+        macro_rules! __test_assert_ne {
+            ($left:expr, $right:expr) => {
+                if ($left) == ($right) {
+                    return Err(Some(stringify!(assertion $left != $right failed)));
+                }
+            };
+            ($left:expr, $right:expr, $msg:literal) => {
+                if ($left) == ($right) {
+                    return Err(Some(stringify!(assertion $left != $right failed: $msg)))
+                }
+            }
+        }
+    });
+    
+
+
+    //  replace `panic!`, `assert!`, etc. with custom macros
+    let mut replacer = MacroReplacer;
+    replacer.visit_item_fn_mut(&mut f);
+
+
+    //  add return statement so the user will not have to
+    f.block.stmts.push(syn::parse_quote! { success!(); });
+
+
+    f.attrs.clear();
+    
+
+    //  modify function signature
+    let orig_name = f.sig.ident.to_string();
+
+    let name = format!("__test_{}_ptr_", orig_name);
+
+    let static_name = proc_macro2::Ident::new(&name, proc_macro2::Span::call_site());
+    let original_name = proc_macro2::Ident::new(&orig_name, proc_macro2::Span::call_site());
+
+    let declaration = if let Some(tn) = test_name {
+        quote! {
+            static mut #static_name : ministd::Test = ministd::Test::new(Some( #tn ), #orig_name, #original_name);
+        }
+    } else {
+        quote! {
+            static mut #static_name : ministd::Test = ministd::Test::new(None, #orig_name, #original_name);
+        }
+    };
+
+    let generated = quote! {
+
+        #[cfg(feature = "testing")]
+        #[unsafe(link_section = ".tests")]
+        #[used]
+        #declaration
+
+        #[cfg(feature = "testing")]
+        #f
+
+    }.into();
+
+    return generated;
+
+    fn check_signature(sig: &Signature) {
+
+        if let Some(_) = sig.abi {
+            panic!("testing functions cannot have any ABI set");
+        }
+
+        if let Some(_) = sig.asyncness {
+            panic!("testing functions cannot be async");
+        }
+
+        if let Some(_) = sig.constness {
+            panic!("testing functions cannot be constant");
+        }
+
+        if let Some(_) = sig.unsafety {
+            panic!("testing functions cannot be unsafe");
+        }
+
+        if sig.inputs.len() > 0 {
+            panic!("testing functions cannot take any arguments");
+        }
+
+        if let Some(_) = sig.generics.gt_token {
+            panic!("rtesting functions cannot have any generic arguments")
+        }
+
+        if let Some(_) = sig.variadic {
+            panic!("testing functions cannot have the variadic argument");
+        }
+
+        match sig.output {
+            ReturnType::Default => {
+                //  OK
+            },
+            _ => panic!("testing functions cannot return any value"),
+        }
+
+    }
+
+    struct MacroReplacer;
+
+    impl VisitMut for MacroReplacer {
+        fn visit_item_fn_mut(&mut self, node: &mut ItemFn) {
+            println!("BRUH");
+            let stmts = &mut node.block.stmts;
+            for i in stmts.iter_mut() {
+                let Stmt::Macro(mac) = i else {
+                    continue
+                };
+
+                if mac.mac.path.is_ident("panic") {
+                    mac.mac.path = syn::parse_quote!(fail);
+                } else if mac.mac.path.is_ident("assert") {
+                    mac.mac.path = syn::parse_quote!(__test_assert);
+                } else if mac.mac.path.is_ident("assert_eq") {
+                    mac.mac.path = syn::parse_quote!(__test_assert_eq);
+                } else if mac.mac.path.is_ident("assert_ne") {
+                    mac.mac.path = syn::parse_quote!(__test_assert_ne);
+                }
+
+            }
+        }
+    }
+}
+
+#[proc_macro_attribute]
+pub fn test_only(attr: TokenStream, input: TokenStream) -> TokenStream {
+
+    let inp = parse_macro_input!(input as Item);
+
+    quote! {
+
+        #[cfg(feature = "testing")]
+        #inp
+
+    }.into()
 
 }

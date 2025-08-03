@@ -20,6 +20,12 @@ pub const PAGE_SIZE: usize = 4096;
 /// - target specific
 pub const PAGE_ALIGN: usize = 4096;
 
+#[cfg(not(target_arch = "x86_64"))]
+pub const PAGE_SIZE: usize = 4096;
+
+#[cfg(not(target_arch = "x86_64"))]
+pub const PAGE_ALIGN: usize = 4096;
+
 pub use core::mem::needs_drop;
 
 pub mod readonly;

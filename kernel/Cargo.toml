@@ -26,6 +26,13 @@ panic="abort"
 opt-level=1
 panic="abort"
 
+[features]
+testing=[]
+    #   makes unit testing support possible
+
+custom_testing=["testing"]
+    #   makes unit testing with `ministd::run_tests!()` possible
+
 
 
 [dependencies]

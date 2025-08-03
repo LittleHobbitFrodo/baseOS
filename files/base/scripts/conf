@@ -79,6 +79,20 @@ echo "arch=\"${arch[@]}\"" >> $UTIL_CONFIG
 echo "iso_name=$iso_name" >> $UTIL_CONFIG
 echo "main_file=$main_file" >> $UTIL_CONFIG
 
+#   build the limine commandline utility for this host
+if [ -e "$LIMINE_CMDLINE" ]; then
+    rm "$LIMINE_CMDLINE"
+fi
+
+gcc -o "$LIMINE_CMDLINE" "$LIMINE_PATH/limine.c"
+if [ "$?" != 0 ]; then error "failed to build the limine command line utility"; exit 2; fi
+
+if [ ! -e "$LIMINE_CMDLINE" ]; then
+    error "failed to build the limine command line utility"
+fi
+
+note "limine cmdline utility build was successful"
+
 
 c_compiler_midnames="-elf- -linux-gnu- -none-linux-gnu-"
 IFS=" "

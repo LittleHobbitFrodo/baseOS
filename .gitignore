@@ -10,3 +10,4 @@ util-x86_64.conf
 util.conf
 target
 bootloader/build/
+bootloader/limine-cmdline

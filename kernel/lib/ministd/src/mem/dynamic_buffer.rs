@@ -37,6 +37,7 @@ fn min_3(v1: usize, v2: usize, v3: usize) -> usize {
 ///     - set to 0 to enable **geometrical growth**
 /// 3. `ALIGN` - defines custom alignment of the data
 ///     - set to 0 to use `align_of::<T>()`
+#[repr(C)]
 pub(crate) struct DynamicBuffer<T: Sized, const STEP: usize, const ALIGN: usize = 0> {
     data: NonNull::<u8>,
     cap: u32,

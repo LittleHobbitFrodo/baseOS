@@ -7,109 +7,51 @@
 //  this module provides basic IO functionalities
 //      such as [`in`] and [`out`] instructions and better text rendering
 
-use core::arch::asm;
-
 #[cfg(feature="renderer")]
 #[macro_use]
 pub mod text;
 
+#[cfg(not(test))]
+mod functions;
 
-pub mod int {
-    use core::arch::asm;
-    
-    #[inline(always)]
-    pub fn disable() {
-        unsafe { asm!("cli"); }
+#[cfg(not(test))]
+pub use functions::*;
+
+
+//  functions below are made to not work intentionally
+//  - if testing is done on other architectures than the kernel is designed for, it fails
+
+#[cfg(test)]
+pub use tst::*;
+
+#[cfg(test)]
+mod tst {
+
+    pub mod int {
+        use core::arch::asm;
+        
+        #[inline(always)]
+        pub fn disable() {}
+
+        #[inline(always)]
+        pub fn enable() {}
     }
 
-    #[inline(always)]
-    pub fn enable() {
-        unsafe { asm!("sti"); }
-    }
-}
+    pub fn outb(port: u16, data: u8) {}
 
-pub fn outb(port: u16, data: u8) {
-    unsafe {
-        asm!("out %0, %1",
-        in("al") data,
-        in("dx") port,
-        options(nostack));
-    }
-}
+    pub fn inb(port: u16) -> u8 { 0 }
 
-pub fn inb(port: u16) -> u8 {
-    let mut ret: u8;
-    unsafe {
-        asm!("in %1, %0",
-        out("al") ret,
-        in("dx")port,
-        options(nostack));
-    }
-    ret
-}
+    pub fn outw(port: u16, data: u16) {}
 
-pub fn outw(port: u16, data: u16) {
-    unsafe {
-        asm!("out %0, %1",
-        in("ax") data,
-        in("dx") port,
-        options(nostack));
-    }
-}
+    pub fn inw(port: u16) -> u16 { 0 }
 
-pub fn inw(port: u16) -> u16 {
-    let mut ret: u16;
-    unsafe {
-        asm!("in %1, %0",
-        out("ax") ret,
-        in("dx") port,
-        options(nostack));
-    }
-    ret
-}
+    pub fn outd(port: u16, data: u32) {}
 
-pub fn outd(port: u16, data: u32) {
-    unsafe {
-        asm!("out %0, %1",
-        in("eax") data,
-        in("dx") port,
-        options(nostack));
-    }
-}
+    pub fn ind(port: u16) -> u32 { 0 }
 
-pub fn ind(port: u16) -> u32 {
-    let mut ret: u32;
-    unsafe {
-        asm!("in %1, %0",
-        out("eax") ret,
-        in("dx") port,
-        options(nostack));
-    }
-    ret
-}
+    pub fn outq(port: u16, data: u64) {}
 
-pub fn outq(port: u16, data: u64) {
-    unsafe {
-        asm!("out %0, %1",
-        in("rax") data,
-        in("dx") port,
-        options(nostack));
-    }
-}
+    pub fn inq(port: u16) -> u64 { 0 }
 
-pub fn inq(port: u16) -> u64 {
-    let mut ret: u64;
-    unsafe {
-        asm!("in %1, %0",
-        out("rax") ret,
-        in("dx") port,
-        options(nostack));
-    }
-    ret
-}
-
-
-pub fn wait() {
-    //  wait aprox. nanosecond
-    outb(0x80, 0);
+    pub fn wait() {}
 }

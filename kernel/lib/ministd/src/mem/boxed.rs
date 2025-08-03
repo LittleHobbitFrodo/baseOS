@@ -17,6 +17,7 @@ use crate::{mem::alloc::ALLOCATOR};
 /// `Box` is used to safely allocate and deallocate memory of type `T`
 /// 
 /// Use `Array` to allocate arrays
+#[repr(transparent)]
 pub struct Box<T: Sized> {
     data: NonNull<T>,
 }

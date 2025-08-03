@@ -2,9 +2,10 @@
 
 source "$PWD/files/base/scripts.conf"
 
-
 archs=""
 debug=false
+custom=false
+arch_set=false
 if [ "$#" != 0 ]; then
     for arg in "$@"; do
         a="$(echo $arg | tr '[:upper:]' '[:lower:]')"
@@ -12,24 +13,33 @@ if [ "$#" != 0 ]; then
             debug)
                 debug=true
                 ;;
+            custom)
+                custom=true
+            ;;
             x86_64)
                 archs="$archs x86_64"
+                arch_set=true
             ;;
             arm64)
                 archs="$archs aarch64"
+                arch_set=true
             ;;
         esac
     done
-else
+fi
+
+if [ "$arch_set" = false ]; then
     archs="$arch"
 fi
 
-cargo_params="--target-dir bin --verbose --target"
+cargo_params="--target-dir bin --verbose"
+if [ "$debug" = false ]; then
+    cargo_params="$cargo_params --release"
+fi
 
 IFS=" "
 for a in $archs; do
-
-    note "building kernel for $a target"
+    note "testing target $a"
 
     if [ ! -e ./tmp/kernel ]; then
         mkdir -p ./tmp/kernel
@@ -46,10 +56,10 @@ for a in $archs; do
     #   compile rust code
 
     cd ./kernel
-        if [ "$debug" == true ]; then
-            $compiler build $cargo_params "$(get_arch $a)-unknown-none"
+        if [ "$custom" = true ]; then
+            $compiler build $cargo_params --target "$(get_arch $a)-unknown-none" --features "custom_testing"
         else
-            $compiler build --release $cargo_params "$(get_arch $a)-unknown-none"
+            $compiler build $cargo_params --target "$(get_arch $a)-unknown-none" --features "testing"
         fi
 
         if [ "$?" != 0 ]; then
@@ -62,17 +72,14 @@ for a in $archs; do
     #   copy compiled kernel into `files` directory
     cp $PWD/kernel/bin/$(get_arch $a)-unknown-none/release/baseOS $(kernel_full $a)
 
-    #cp $PWD/kernel/bin/$(get_arch $a)-unknown-none/release/baseOS ./tmp/kernel/kernel.o
-    #   link kernel
-    #find "./tmp/kernel" -name "*.o" -print0 | xargs -0 $linker -m "elf_$(get_arch $a)" -nostdlib -static --no-dynamic-linker -z text -z max-page-size=0x1000 -T "$PWD/kernel/linker.ld" -o $(kernel_full $a)
-    #if [ "$?" != 0 ]; then
-    #    error "failed to link kernel"
-    #    exit 2
-    #fi
-    #cp ./tmp/kernel/kernel.o $(kernel_full $a)
-
-    #   clear temporary files for other builds
     rm -rf ./tmp/*
 
+    $SCRIPTS/mkiso $a
+    if [ "$?" != 0 ]; then
+        error "failed to create image for $a"
+        exit 1
+    fi
+
+    $SCRIPTS/run $a
 
 done
