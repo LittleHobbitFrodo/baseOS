@@ -51,6 +51,12 @@ pub mod rc;
 pub(crate) use dynamic_buffer::DynamicBuffer;
 
 pub use crate::convert::Align;
+pub use core::mem::{ManuallyDrop, MaybeUninit};
+
+
+
+
+
 
 
 

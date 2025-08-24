@@ -17,6 +17,8 @@ pub mod init;
 pub mod manage;
 pub mod mem;
 
+pub mod string_test;
+
 //  local crates
 pub use ministd;
 pub use bootloader;

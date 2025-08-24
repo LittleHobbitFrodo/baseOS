@@ -85,7 +85,7 @@ impl<const STEP: usize> String<STEP> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         if Self::VALID {
-        Self { data: DynamicBuffer::with_capacity(capacity) }
+            Self { data: DynamicBuffer::with_capacity(capacity) }
         } else {
             panic!("STEP has to be either `0` or multiple of 4");
         }
@@ -344,13 +344,13 @@ impl<const STEP: usize> String<STEP> {
     /// Shrinks the `capacity` of this `String` to match its length
     #[inline]
     pub fn shrink_to_fit(&mut self) {
-        self.data.resize_exact(self.len());
+        self.data.resize(self.len());
     }
 
     /// Shrinks the `capacity` of this `String` to the specified value
     /// The `capacity` will remain at least as large as both the length and the supplied value
     pub fn shrink_to(&mut self, len: usize) {
-        self.data.resize_exact(core::cmp::min(self.len(), len));
+        self.data.resize(core::cmp::max(self.len(), len));
     }
     
     /// Removes character at the `index` position
@@ -489,6 +489,12 @@ impl<const STEP: usize> String<STEP> {
 
         self.data.size += string.len() as u32;
 
+    }
+
+    /// Returns a mutable reference to the contents of the string.
+    /// - **warning** this function is not tested enough yet and may result in undefined behaviour
+    pub unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8, ALIGN> {
+        unsafe { ((self as *mut Self) as *mut Vec<u8, ALIGN>).as_mut().unwrap_unchecked() }
     }
 
     /// Tries to insert string at the `index` position
@@ -1148,3 +1154,16 @@ impl<const STEP: usize> Write for String<STEP> {
         self.try_push_str(s).map_err(|_| core::fmt::Error)
     }
 }
+
+
+impl<'l, const STEP: usize> PartialEq<String<STEP>> for &'l str {
+    #[inline(always)]
+    fn eq(&self, other: &String<STEP>) -> bool {
+        other == self
+    }
+    #[inline(always)]
+    fn ne(&self, other: &String<STEP>) -> bool {
+        other != self
+    }
+}
+

@@ -1864,7 +1864,7 @@ impl<T: Sized + Clone, const STEP: usize, const ALIGN: usize> Clone for Vec<T, S
     }
 }
 
-impl<T: Sized + TryClone, const STEP: usize> TryClone for Vec<T, STEP> {
+impl<T: Sized + TryClone, const STEP: usize, const ALIGN: usize> TryClone for Vec<T, STEP, ALIGN> {
     type Error = ();
 
     fn try_clone(&self) -> Result<Self, Self::Error>
@@ -1893,7 +1893,7 @@ impl<T: Sized + TryClone, const STEP: usize> TryClone for Vec<T, STEP> {
     }
 }
 
-impl<T: Sized, const STEP: usize> Deref for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> Deref for Vec<T, STEP, ALIGN> {
     type Target = [T];
     #[inline]
     /// Does not check for null at all
@@ -1902,7 +1902,7 @@ impl<T: Sized, const STEP: usize> Deref for Vec<T, STEP> {
     }
 }
 
-impl<T: Sized, const STEP: usize> DerefMut for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> DerefMut for Vec<T, STEP, ALIGN> {
     #[inline]
     /// Does not check for null at all
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -1910,7 +1910,7 @@ impl<T: Sized, const STEP: usize> DerefMut for Vec<T, STEP> {
     }
 }
 
-impl<T: Sized, const STEP: usize> Default for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> Default for Vec<T, STEP, ALIGN> {
     #[inline(always)]
     /// Equivalent of `Vec::new()`
     fn default() -> Self {
@@ -1919,7 +1919,7 @@ impl<T: Sized, const STEP: usize> Default for Vec<T, STEP> {
 }
 
 
-impl<T: Sized, const STEP: usize> Debug for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> Debug for Vec<T, STEP, ALIGN> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         _ = writeln!(f, "Vec: ptr: {:p}, size: {}, capacity: {}",
             self.data.data().as_ptr(), self.data.size, self.capacity());
@@ -1929,11 +1929,11 @@ impl<T: Sized, const STEP: usize> Debug for Vec<T, STEP> {
 
 
 
-impl<T, U, const SSTEP: usize, const OSTEP: usize>
-    PartialEq<Vec::<U, OSTEP>> for Vec<T, SSTEP>
+impl<T, U, const SSTEP: usize, const OSTEP: usize, const SALIGN: usize, const OALIGN: usize>
+    PartialEq<Vec::<U, OSTEP, OALIGN>> for Vec<T, SSTEP, SALIGN>
     where T: Sized + PartialEq<U> {
 
-    fn eq(&self, other: &Vec::<U, OSTEP>) -> bool {
+    fn eq(&self, other: &Vec::<U, OSTEP, OALIGN>) -> bool {
 
         match self.is_empty() as usize | ((other.is_empty() as usize) << 1) {
             0b00 => {   //  both have any data
@@ -1954,7 +1954,7 @@ impl<T, U, const SSTEP: usize, const OSTEP: usize>
         }
     }
 
-    fn ne(&self, other: &Vec::<U, OSTEP>) -> bool {
+    fn ne(&self, other: &Vec::<U, OSTEP, OALIGN>) -> bool {
         
         match self.is_empty() as usize | ((other.is_empty() as usize) << 1) {
             0b00 => {   //  both have any data
@@ -1978,7 +1978,7 @@ impl<T, U, const SSTEP: usize, const OSTEP: usize>
 
 }
 
-impl<T, U, const STEP: usize> PartialEq<[U]> for Vec<T, STEP>
+impl<T, U, const STEP: usize, const ALIGN: usize> PartialEq<[U]> for Vec<T, STEP, ALIGN>
     where T: Sized + PartialEq<U>, U: Sized {
 
     fn eq(&self, other: &[U]) -> bool {
@@ -2002,7 +2002,7 @@ impl<T, U, const STEP: usize> PartialEq<[U]> for Vec<T, STEP>
     }
 }
 
-impl<T, U, const STEP: usize, const N: usize> PartialEq<[U; N]> for Vec<T, STEP>
+impl<T, U, const STEP: usize, const N: usize, const ALIGN: usize> PartialEq<[U; N]> for Vec<T, STEP, ALIGN>
     where T: Sized + PartialEq<U>, U: Sized {
 
     fn eq(&self, other: &[U; N]) -> bool {
@@ -2022,11 +2022,11 @@ impl<T, U, const STEP: usize, const N: usize> PartialEq<[U; N]> for Vec<T, STEP>
     }
 }
 
-impl<'l, T, const STEP: usize> From<&'l [T]> for Vec<T, STEP>
+impl<'l, T, const STEP: usize, const ALIGN: usize> From<&'l [T]> for Vec<T, STEP, ALIGN>
     where T: Sized + Clone {
     fn from(value: &'l [T]) -> Self {
 
-        let mut db = DynamicBuffer::<T, STEP>::with_capacity(value.len());
+        let mut db = DynamicBuffer::<T, STEP, ALIGN>::with_capacity(value.len());
         db.size = value.len() as u32;
 
         let mut this = db.data();
@@ -2043,10 +2043,10 @@ impl<'l, T, const STEP: usize> From<&'l [T]> for Vec<T, STEP>
     }
 }
 
-impl<'l, T, const STEP: usize, const N: usize> From<&'l [T; N]> for Vec<T, STEP>
+impl<'l, T, const STEP: usize, const N: usize, const ALIGN: usize> From<&'l [T; N]> for Vec<T, STEP, ALIGN>
     where T: Sized + Clone {
     fn from(value: &'l [T; N]) -> Self {
-        let mut db = DynamicBuffer::<T, STEP>::with_capacity(N);
+        let mut db = DynamicBuffer::<T, STEP, ALIGN>::with_capacity(N);
         db.size = N as u32;
 
         let mut this = db.data();
@@ -2063,10 +2063,10 @@ impl<'l, T, const STEP: usize, const N: usize> From<&'l [T; N]> for Vec<T, STEP>
     }
 }
 
-impl<T: Sized, const STEP: usize, const N: usize> From<[T; N]> for Vec<T, STEP>
+impl<T: Sized, const STEP: usize, const N: usize, const ALIGN: usize> From<[T; N]> for Vec<T, STEP, ALIGN>
     where T: Sized + Clone {
     fn from(value: [T; N]) -> Self {
-        let mut db = DynamicBuffer::<T, STEP>::with_capacity(N);
+        let mut db = DynamicBuffer::<T, STEP, ALIGN>::with_capacity(N);
         db.size = N as u32;
 
         let mut this = db.data();
@@ -2083,10 +2083,10 @@ impl<T: Sized, const STEP: usize, const N: usize> From<[T; N]> for Vec<T, STEP>
     }
 }
 
-impl<const STEP: usize> From<&str> for Vec<u8, STEP> {
+impl<const STEP: usize, const ALIGN: usize> From<&str> for Vec<u8, STEP, ALIGN> {
     fn from(value: &str) -> Self {
 
-        let mut db = DynamicBuffer::<u8, STEP>::with_capacity(value.len());
+        let mut db = DynamicBuffer::<u8, STEP, ALIGN>::with_capacity(value.len());
         db.size = value.len() as u32;
 
         unsafe {
@@ -2098,7 +2098,7 @@ impl<const STEP: usize> From<&str> for Vec<u8, STEP> {
     }
 }
 #[cfg(all(feature="allocator", feature="spin", feature="box"))]
-impl<T: Sized, const STEP: usize> From<Box<T>> for Vec<T, STEP> {
+impl<T: Sized, const STEP: usize, const ALIGN: usize> From<Box<T>> for Vec<T, STEP, ALIGN> {
     fn from(value: Box<T>) -> Self {
         let m = ManuallyDrop::new(value);
         Self {
@@ -2107,11 +2107,11 @@ impl<T: Sized, const STEP: usize> From<Box<T>> for Vec<T, STEP> {
     }
 }
 
-impl<const STEP: usize> From<&CStr> for Vec<u8, STEP> {
+impl<const STEP: usize, const ALIGN: usize> From<&CStr> for Vec<u8, STEP, ALIGN> {
     /// Copies the string content into a Vec
     fn from(value: &CStr) -> Self {
         let len = value.count_bytes();
-        let mut db = DynamicBuffer::<u8, STEP>::with_capacity(len);
+        let mut db = DynamicBuffer::<u8, STEP, ALIGN>::with_capacity(len);
         db.size = len as u32;
 
         unsafe {
@@ -2122,14 +2122,14 @@ impl<const STEP: usize> From<&CStr> for Vec<u8, STEP> {
     }
 }
 
-impl<T, const STEP: usize> Hash for Vec<T, STEP>
+impl<T, const STEP: usize, const ALIGN: usize> Hash for Vec<T, STEP, ALIGN>
     where T: Sized + Hash {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         Hash::hash_slice(self.as_slice().expect("vector is empty"), state);
     }
 }
 
-
+//impl<T, const STEP: usize, const ALIGN>
 
 
 

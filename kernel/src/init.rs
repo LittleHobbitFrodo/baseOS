@@ -6,10 +6,11 @@
 
 use ministd::entry;
 use ministd::init;
+use ministd::RENDERER;
 use ministd::{panic_fmt, print, println};
 use ministd::{testing, test_only};
-#[test_only]
 use ministd::String;
+use ministd::renderer::MinistdRenderer;
 
 
 
@@ -35,7 +36,11 @@ fn init() -> Result<(), ()> {
     println!("hello world!");
 
     //  run all tests
-    ministd::run_tests!(false);
+    ministd::run_tests!("STRING", false);
+
+    let mut rend = RENDERER.lock();
+    rend.set_color(0x00ff00);
+    println!(rend: "ALL TESTS PASSED");
 
     Ok(())
 

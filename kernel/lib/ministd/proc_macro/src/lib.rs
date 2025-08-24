@@ -61,6 +61,7 @@ pub fn entry(attr: TokenStream, input: TokenStream) -> TokenStream {
         #[cfg(all(feature = "testing", not(feature = "custom_testing")))]
         #[unsafe(no_mangle)]
         extern "C" fn _start() -> ! {
+            //  testing entry
 
             unsafe extern "Rust" {
                 fn __run_tests_with(test_name: Option<&'static str>, clear: bool);
@@ -70,7 +71,7 @@ pub fn entry(attr: TokenStream, input: TokenStream) -> TokenStream {
 
             let _ = ministd::init::allocator().expect("FAILED TO INITIALIZE ALLOCATOR");
             
-            unsafe { __run_tests_with(None, true) }
+            unsafe { __run_tests_with(None, true) };
             ministd::hang();
         }
 

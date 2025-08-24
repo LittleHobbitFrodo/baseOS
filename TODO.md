@@ -15,6 +15,7 @@ Yes, this is my todolist. Take a look if interested.
 ## Rust
 
 - Add the `Cow` type
+- rewrite unit tests (swap panic handler for tests instead of returning Result)
 
 ### Ministd
 - Add support for aarch64
