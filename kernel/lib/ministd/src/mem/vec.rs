@@ -15,8 +15,8 @@ use core::slice::{self, from_raw_parts, from_raw_parts_mut};
 use core::ops::{Bound::*, Deref, DerefMut, Index, IndexMut, Range, RangeBounds};
 use core::cmp::Ordering::*;
 
-use crate::mem::DynamicBuffer;
-use crate::{TryClone};
+use crate::mem::{Align, DynamicBuffer};
+use crate::{Array, TryClone};
 
 #[cfg(all(feature="allocator", feature="spin", feature="box"))]
 use crate::Box;
@@ -77,6 +77,34 @@ impl<T: Sized> Vec<T> {
 
 }
 
+impl<T: Sized> Vec<T> {
+    /// Constructs new empty `Vec<T>` with certain `STEP`
+    /// - does not allocate memory
+    pub const fn new_with_step<const S: usize>() -> Vec<T, S> {
+        Vec {
+            data: DynamicBuffer::<T, S>::empty(),
+        }
+    }
+
+    /// Constructs new empty `Vec<T>` with certain `STEP` and `ALIGN`
+    /// - does not allocate eny memory
+    pub const fn new_with_step_align<const S: usize, const A: usize>() -> Vec<T, S, A> {
+        Vec {
+            data: DynamicBuffer::<T, S, A>::empty(),
+        }
+    }
+
+    /// Construcs new empty `Vec<T>` with certain `ALIGN`
+    /// - does not allocate any memory
+    pub const fn new_with_align<const A: usize>() -> Vec<T, 0, A> {
+        Vec {
+            data: DynamicBuffer::<T, 0, A>::empty(),
+        }
+    }
+
+}
+
+
 impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
     /// Describes memory layout for `Vec<T>` with certain `capacity`
@@ -115,16 +143,9 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
         }
     }
 
-    /// Constructs new empty `Vec<T>` with certain `STEP`
-    /// - does not allocate memory
-    pub const fn new_with_step<const S: usize>() -> Vec<T, S> {
-        Vec {
-            data: DynamicBuffer::<T, S>::empty(),
-        }
-    }
-
 
     /// Constructs new empty `Vec` with at least the specified capacity allocated
+    /// - the vector will be able to hold at least `capacity` elements without reallocating
     /// - **panics** if allocation fails
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
@@ -135,6 +156,7 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
 
     /// Tries to construct new empty `Vec<T>` with at least the specified capacity allocated
+    /// - the vector will be able to hold at least `capacity` elements without reallocating
     /// - returns `Err` if allocation fails
     #[inline]
     pub fn try_with_capacity(capacity: usize) -> Result<Self, ()> {
@@ -295,7 +317,9 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
         self.reserve(other.len());
 
-        let slice = unsafe { slice::from_raw_parts_mut(self.as_mut_ptr().add(self.len()), other.len()) };
+        let slice = unsafe {
+            slice::from_raw_parts_mut(self.as_mut_ptr().add(self.len()), other.len())
+        };
 
         for (i, item) in slice.iter_mut().enumerate() {
             *item = other[i].clone();
@@ -401,9 +425,12 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
     /// Reserves capacity for at least `additional` more elements
     /// - **panics** if allocation fails
     /// - `capacity` will be greater than or equal to `self.len() + additional` 
-    #[inline(always)]
+    #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.data.resize(self.len() + additional);
+        let min = self.len() + additional;
+        if self.capacity() < min {
+            self.data.resize(min);
+        }
     }
 
     /// Tries to reserve capacity for at least `additional` more elements
@@ -411,7 +438,12 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
     /// - `capacity` will be greater than or equal to `self.len() + additional` 
     #[inline(always)]
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), ()> {
-        self.data.try_resize(self.len() + additional)
+        let min = self.len() + additional;
+        if self.capacity() < min {
+            self.data.try_resize(min)
+        } else {
+            Ok(())
+        }
     }
 
     /// Reserves the minimum capacity for at least `additional` more elements
@@ -420,8 +452,12 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
     /// - `capacity` will be greater than or equal to `self.len() + additional` 
     #[inline(always)]
     pub fn reserve_exact(&mut self, additional: usize) {
-        self.data.resize_exact(self.len() + additional);
+        let min = self.len() + additional;
+        if self.capacity() < min {
+            self.data.resize_exact(min);
+        }
     }
+
 
     /// Tries to reserve the minimum capacity for at least `additional` more elements
     /// - unlike `try_reserve`, this does not overallocate memory
@@ -429,7 +465,12 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
     /// - `capacity` will be greater than or equal to `self.len() + additional` 
     #[inline]
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), ()> {
-        self.data.try_resize_exact(self.len() + additional)
+        let min = self.len() + additional;
+        if self.capacity() < min {
+            self.data.try_resize_exact(min)
+        } else {
+            Ok(())
+        }
     }
 
     /// Appends one element at the end of the vector
@@ -464,6 +505,38 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
     }
 
+    /// Appends one element to the vector and returns mutable reference to the pushed element
+    /// - **panics** if allocation fails
+    pub fn push_mut(&mut self, value: T) -> &mut T {
+        if self.len() == self.capacity() {
+            self.expand();
+        }
+        unsafe {
+            let mut ptr = self.data.as_non_null().add(self.len());
+            ptr.write(value);
+            self.data.size += 1;
+            ptr.as_mut()
+        }
+    }
+
+    /// Tries to append one element to the vector and returns mutable reference to the pushed element
+    /// - returns `Err` if allocation fails
+    pub fn try_push_mut(&mut self, value: T) -> Result<&mut T, T> {
+        if self.len() == self.capacity() {
+            if let Err(_) = self.try_expand() {
+                return Err(value);
+            }
+        }
+        unsafe {
+            let mut ptr = self.data.as_non_null().add(self.len());
+            ptr.write(value);
+            self.data.size += 1;
+            Ok(ptr.as_mut())
+        }
+    }
+
+
+
     /// Appends the vector if there is enough spare space in allocated memory
     pub fn push_within_capacity(&mut self, val: T) -> Result<(), T> {
         if self.len() == self.capacity() {
@@ -488,6 +561,20 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
         self.data.size += 1;
     }
 
+    /// Appens the vector if there is enough spare space in allocated memory and returns mutable reference to the pushed element
+    pub fn push_mut_within_capacity(&mut self, value: T) -> Result<&mut T, T> {
+        if self.len() == self.capacity() {
+            return Err(value);
+        } else {
+            unsafe {
+                let mut ptr = self.data.as_non_null().add(self.len());
+                ptr.write(value);
+                self.data.size += 1;
+                Ok(ptr.as_mut())
+            }
+        }
+    }
+
     /// Shrinks the capacity of the vector as much as possible
     /// - **panics** if allocation fails
     #[inline]
@@ -505,15 +592,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
     /// Shrinks the vector to some size while dropping all elements that will not be preserved
     /// - **panics** if allocation fails
     pub fn shrink_to(&mut self, size: usize) {
-        if self.capacity() > size {
-            if size < self.len() {
-                unsafe {
-                    drop_in_place(from_raw_parts_mut(self.data.as_ptr()
-                    .add(size), self.len() - size));
-                }
-                self.data.size = size as u32;
-            }
-            self.data.resize_exact(size);
+        if size == 0 { return; }
+        let wanted = core::cmp::max(size, self.len());
+        if self.capacity() > wanted {
+            self.data.resize(wanted);
         }
     }
 
@@ -663,6 +745,38 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
         self.data.size += 1;
 
+    }
+
+    /// Inserts element into the vector and returns mutable reference to the inserted element
+    /// - **panics** if allocation fails or if `index` is out of bounds
+    pub fn insert_mut(&mut self, index: usize, val: T) -> &mut T {
+        let len = self.len();
+
+        if index > len {
+            #[cfg(all(feature="allocator", feature="spin", feature="string"))]
+            panic_fmt!("index {index} out of bounds 0..{}", self.len());
+            #[cfg(not(all(feature="allocator", feature="spin", feature="string")))]
+            panic!("index is out of bounds");
+        } else if index == len {
+            self.push(val);
+            return unsafe { self.last_mut_unchecked() };
+        }
+
+        if len == self.capacity() {
+            self.expand();
+        }
+
+        unsafe {
+            let ptr = self.data.as_ptr().add(index);
+
+            core::ptr::copy(ptr, ptr.add(1), len - index);
+
+            self.data.size += 1;
+
+            ptr.write(val);
+
+            ptr.as_mut().unwrap_unchecked()
+        }
     }
 
     /// Tries to insert `val` into the vector at `index` index
@@ -843,10 +957,26 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
         }
     }
 
-    /// Removes last `n` elements of the vector
+    /// Removes (drops) last `n` elements of the vector
     /// - does not affect `capacity`
-    pub fn pop_n(&mut self, n: usize) {
-        if self.len() > 0 {
+    /// - if `n` is greater than or equal to `self.len()`, all elements are dropped
+    pub fn pop_n(&mut self, mut n: usize) {
+        if self.len() > 0 && n > 0 {
+
+            n = core::cmp::min(n, self.len());
+
+            unsafe {
+                let start = self.len() - n;
+
+                drop_in_place(self.get_unchecked_mut(start..self.len()).as_mut_ptr());
+                self.data.size -= n as u32;
+
+
+                //drop_in_place();
+            }
+        }
+
+        /*if self.len() > 0 {
 
             if n <= self.len() {
                 
@@ -867,7 +997,7 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
             }
             
-        }
+        }*/
     }
 
     /// Drops the last element if the vector if `f` returns `true`
@@ -975,12 +1105,14 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
             unsafe {
                 let e = self.data.data().add(index);
+                let removed = e.read();
 
                 drop_in_place(e.as_ptr());
 
                 e.write(self.data.data().add(self.len()).read());
 
-                e.read()
+                //e.read()
+                removed
 
             }
 
@@ -1468,7 +1600,7 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
     /// Returns an mutable sublice from the vector without checking bounds
     /// - can possibly cause **address boundary errors**
     /// - please use `get_mut()` as safe alternative
-    pub unsafe fn get_unchecked_mut<R>(&mut self, range: R) -> &[T]
+    pub unsafe fn get_unchecked_mut<R>(&mut self, range: R) -> &mut [T]
     where R: RangeBounds<usize> {
         let (start, end) = self.handle_bounds(&range);
         unsafe {
@@ -1984,7 +2116,11 @@ impl<T, U, const STEP: usize, const ALIGN: usize> PartialEq<[U]> for Vec<T, STEP
     fn eq(&self, other: &[U]) -> bool {
 
         if self.len() == other.len() {
-            unsafe { self.as_slice_unchecked() == other }
+            if let Some(slice) = self.as_slice() {
+                slice == other
+            } else {
+                self.len() == 0
+            }
         } else {
             false
         }
@@ -1993,7 +2129,7 @@ impl<T, U, const STEP: usize, const ALIGN: usize> PartialEq<[U]> for Vec<T, STEP
 
     fn ne(&self, other: &[U]) -> bool {
         
-        if self.len() == other.len() {
+        if self.len() == other.len() && self.len() != 0 {
             unsafe { self.as_slice_unchecked() != other }
         } else {
             true
@@ -2160,7 +2296,7 @@ macro_rules! vec {
     () => (
         $crate::Vec::vec_new()
     );
-    ($step:expr) => {
+    ($step:expr; ) => {
         $crate::Vec::vec_new_with_step::<$step>()
     };
     ($elem:expr; $n:expr) => (
@@ -2174,5 +2310,8 @@ macro_rules! vec {
     );
     [$step:expr; $($x:expr),+ $(,)?] => {
         $crate::Array::from([$($x),+]).into_vec::<$step>()
-    }
+    };
+    [$x:expr] => {
+        $crate::Array::from([$($x),+]).into_vec::<0>()
+    };
 }

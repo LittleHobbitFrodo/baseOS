@@ -6,6 +6,7 @@
 
 use ministd::entry;
 use ministd::init;
+use ministd::{Vec, vec};
 use ministd::RENDERER;
 use ministd::{panic_fmt, print, println};
 use ministd::{testing, test_only};
@@ -35,12 +36,10 @@ fn init() -> Result<(), ()> {
 
     println!("hello world!");
 
-    //  run all tests
-    ministd::run_tests!("STRING", false);
+    
 
-    let mut rend = RENDERER.lock();
-    rend.set_color(0x00ff00);
-    println!(rend: "ALL TESTS PASSED");
+    //  run all tests
+    ministd::run_tests!("VEC", false);
 
     Ok(())
 

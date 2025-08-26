@@ -4,7 +4,7 @@
 
 use crate::RENDERER;
 use crate::renderer::MinistdRenderer;
-use crate::{eprintln, println};
+use crate::{eprintln, eprint, println, print};
 
 unsafe extern "C" {
     pub(crate) static __start_tests: usize;
@@ -106,32 +106,45 @@ pub(crate) extern "Rust" fn __run_tests_with(test_name: Option<&'static str>, cl
         if clear { RENDERER.lock().clear(); }
 
         if let Some(name) = test.test_name() {
-            eprintln!("RUNNING TEST \"{}\" ({}())", name, test.fn_name());
+            eprint!("RUNNING TEST \"{}\" ({}())", name, test.fn_name());
         } else {
-            eprintln!("RUNNING TEST {}()", test.fn_name());
+            eprint!("RUNNING TEST {}()", test.fn_name());
         }
 
-        if let Err(m) = test.run() {
-            //  report failure
-
+        if let Err(err) = test.run() {
             let mut rend = crate::RENDERER.lock();
-            rend.set_color(0xff0808);
+            let width = rend.fb().width();
+            //  report error
+            rend.set_color(0xff0000);   //  red
+            if let Some(e) = err {
 
-            if let Some(msg) = m {
-                if let Some(name) = test.test_name() {
-                    println!(rend: "TEST \"{}\" ({}()) FAILED: {msg}", name, test.fn_name())
+                if width - rend.column() >= e.len() + 1 {
+                    //  print error message
+                    _ = rend.set_column(width - e.len() - 1);
+                    println!(rend: "{e}");
                 } else {
-                    println!(rend: "TEST {}() FAILED: {msg}", test.fn_name())
+                    rend.endl();
+                    println!(rend: "\tERROR: {e}");
                 }
             } else {
-                println!(rend: "TEST {}() FAILED", test.fn_name())
+                let msg = "UNKNOWN ERROR";
+                _ = rend.set_column(width - msg.len());
+                println!(rend: "{msg}");
             }
 
-
-            
-            crate::hang();
-
+            //  reset color
+            rend.set_color(0xffffff);
+        } else {
+            let mut rend = crate::RENDERER.lock();
+            let width = rend.fb().width();
+            rend.set_color(0x00ff00);   //  green
+            _ = rend.set_column(width - 3);
+            println!(rend: "OK");
+            //  reset color
+            rend.set_color(0xffffff);
         }
+
+        
     };
 
     //  iterate over all tests and run them

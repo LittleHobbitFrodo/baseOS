@@ -18,6 +18,7 @@ pub mod manage;
 pub mod mem;
 
 pub mod string_test;
+pub mod vec_tests;
 
 //  local crates
 pub use ministd;

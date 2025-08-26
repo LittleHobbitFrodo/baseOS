@@ -641,6 +641,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
         self.data.as_ptr() as *mut T
     }
 
+    pub const fn as_non_null(&self) -> NonNull<T> {
+        self.data.cast()
+    }
+
     /// Returns pointer to data as `NonNull`
     pub const fn data(&self) -> NonNull<T> {
         unsafe { NonNull::new_unchecked(self.data.as_ptr() as *mut T) }

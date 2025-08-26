@@ -66,7 +66,7 @@ impl Renderer {
                     }
                 }
                 self.row += 1;
-                if self.row >= self.fb.height {
+                if self.row >= self.fb.width {
                     self.endl();
                 }
             }
