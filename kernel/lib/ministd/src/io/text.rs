@@ -79,6 +79,7 @@ macro_rules! eprint {
         use core::fmt::Write;
         use $crate::renderer::MinistdRenderer;
 
+
         let c = $guard.color();
         $guard.set_color(0xff9a9a);
 

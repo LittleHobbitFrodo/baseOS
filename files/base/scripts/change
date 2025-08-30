@@ -1,7 +1,7 @@
 #!/bin/bash
 
-
 source "$PWD/files/base/scripts.conf"
+
 
 if [ "$#" -lt 3 ]; then
     error "$(blue change): expected at least 3 parameters"
@@ -9,8 +9,11 @@ if [ "$#" -lt 3 ]; then
 fi
 
 file="$(echo $1 | tr '[:upper:]' '[:lower:]')"
+#echo file: "$file"
 attr="$(echo $2 | tr '[:upper:]' '[:lower:]')"
+#echo "attr: $attr"
 value="$3"
+#echo "value: $3"
 
 if [[ "$attr" != name && "$attr" != version && "$attr" != release ]]; then
     error "unknown attribue '$attr'"
@@ -18,10 +21,12 @@ if [[ "$attr" != name && "$attr" != version && "$attr" != release ]]; then
     exit 1
 fi
 
+#echo "$OS_CONFIG"
+
 
 case $file in
     os)
-        sed -i '' "s/^$attr=.*/$attr=$value/" $OS_CONFIG
+        sed -i '' "s/^$attr=.*/$attr=$value/" "$OS_CONFIG"
     ;;
     kernel)
         sed -i '' "s/^$attr=.*/$attr=$value/" $KERNEL_CONFIG

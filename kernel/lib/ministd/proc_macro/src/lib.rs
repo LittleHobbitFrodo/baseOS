@@ -2,15 +2,19 @@
 
 use proc_macro::*;
 
-use proc_macro2::TokenStream as TokenStream2;
+/*use proc_macro2::TokenStream as TokenStream2;
 use quote::{TokenStreamExt, quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::token::Pound;
+use syn::token::Pound;*/
+use quote::quote;
 use syn::{
-    parse_macro_input, parse_quote, parse_quote_spanned, Attribute, Error, Expr, ExprLit, ExprPath, FnArg, Item, ItemFn, ItemStatic, ItemStruct, Lit, Path, ReturnType, Type, Visibility
-};
+    parse_macro_input, parse_quote, FnArg, Item,
+    ItemFn, Path, ReturnType, Type };
+
+/*use syn::{parse_quote_spanned, Attribute, Error, Expr, ExprLit, ExprPath, ItemStatic, ItemStruct, Lit, Visibility, ExprMacro};*/
+
 use syn::{PatType, TypeReference, TypePath, Signature, GenericArgument};
-use syn::{ExprMacro, visit_mut::{self, VisitMut}, Stmt};
+use syn::{visit_mut::VisitMut, Stmt};
 
 
 const EXPECTED_FN_ARGS: ([&'static str; 2], [&'static str; 2]) = (["ministd", "HeapRef"], ["ministd", "Allocator"]);
@@ -531,6 +535,7 @@ pub fn testing(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     //  add custom macros to the function
     f.block.stmts.insert(0, syn::parse_quote! {
+        #[allow(unused_macros)]
         macro_rules! fail {
             () => { return Err(None); };
             ($msg:literal) => { return Err(Some($msg)); };
@@ -538,12 +543,14 @@ pub fn testing(attr: TokenStream, input: TokenStream) -> TokenStream {
     });
 
     f.block.stmts.insert(0, syn::parse_quote! {
+        #[allow(unused_macros)]
         macro_rules! success {
             () => { return Ok(()); }
         }
     });
 
     f.block.stmts.insert(0, syn::parse_quote! {
+        #[allow(unused_macros)]
         macro_rules! __test_assert {
             ($e:expr) => {
                 if !($e) {
@@ -559,6 +566,7 @@ pub fn testing(attr: TokenStream, input: TokenStream) -> TokenStream {
     });
 
     f.block.stmts.insert(0, syn::parse_quote! {
+        #[allow(unused_macros)]
         macro_rules! __test_assert_eq {
             ($left:expr, $right:expr) => {
                 if ($left) != ($right) {
@@ -574,6 +582,7 @@ pub fn testing(attr: TokenStream, input: TokenStream) -> TokenStream {
     });
 
     f.block.stmts.insert(0, syn::parse_quote! {
+        #[allow(unused_macros)]
         macro_rules! __test_assert_ne {
             ($left:expr, $right:expr) => {
                 if ($left) == ($right) {
@@ -677,7 +686,6 @@ pub fn testing(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     impl VisitMut for MacroReplacer {
         fn visit_item_fn_mut(&mut self, node: &mut ItemFn) {
-            println!("BRUH");
             let stmts = &mut node.block.stmts;
             for i in stmts.iter_mut() {
                 let Stmt::Macro(mac) = i else {
@@ -700,7 +708,7 @@ pub fn testing(attr: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn test_only(attr: TokenStream, input: TokenStream) -> TokenStream {
+pub fn test_only(_attr: TokenStream, input: TokenStream) -> TokenStream {
 
     let inp = parse_macro_input!(input as Item);
 

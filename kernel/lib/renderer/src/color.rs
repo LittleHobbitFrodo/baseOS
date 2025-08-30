@@ -5,7 +5,7 @@
 
 //  this file provides simple [`Color`] structure to use with the renderer
 
-use core::{fmt::Display, time::Duration};
+//use core::{fmt::Display, time::Duration};
 
 use crate::{MinistdRenderer, Mutex, MutexGuard};
 

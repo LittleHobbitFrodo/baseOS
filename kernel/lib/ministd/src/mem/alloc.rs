@@ -31,15 +31,12 @@ pub type Heap = allocator::Heap<32>;
 
 /// The default Allocator type for BaseOS
 /// - has no members on purpose to prevent taking any memory with the use of `Global` allocator in other crates
-pub struct Allocator {}
+pub struct Allocator { }
 
 
 impl Allocator {
     pub(crate) const fn new() -> Self {
-        Self {
-            //alloc: allocator::LockedHeap::new(),
-            //regions: Mutex::new(Region::empty()),
-        }
+        Self { }
     }
 
     /// allocates data of type T with proper alignment
@@ -76,13 +73,6 @@ impl Allocator {
         }
 
         Ok(unsafe { NonNull::new_unchecked(data) })
-        
-        /*if let Ok(d) = self.alloc.lock().alloc(layout) {
-            let data = unsafe { NonNull::new_unchecked(d.as_ptr() as *mut MaybeUninit<T>) };
-            Ok(data)
-        } else {
-            Err(())
-        }*/
     }
 
     /// deallocate pointer from heap and run its `drop` if it is needed

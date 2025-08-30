@@ -14,7 +14,8 @@ echo "subcommands:
     $(blue run)             - runs the OS in emulator
     $(blue dep)             - installs or removes the tools needed to build and run the operating system ($(red "needs internet connection"))
     $(blue change)          - allows you to change project info
-    $(blue mkiso)           - creates bootable ISO for your OS"
+    $(blue mkiso)           - creates bootable ISO for your OS
+    $(blue check)           - checks for errors"
 echo
 echo "$(magenta NOTE ): for more info use ./util help <subcommands>
     for example: $(green "./util help build run") will show information about the $(blue build) and $(blue run) subcommand"
@@ -33,13 +34,6 @@ IFS=' '
 
 for i in $CMD; do
     case $i in 
-        
-        info)
-            echo "$(green ./util) $(blue info)"
-            echo "  $(yellow 'prints information about your OS project')"
-            echo "  $(green ./util) $(blue "info os") prints information about OS"
-            echo "  $(green ./util) $(blue "info kernel") prints information about kernel"
-        ;;
         conf)
             echo "$(green ./util) $(blue conf)"
             echo "  $(yellow 'configures your project')"
@@ -80,12 +74,12 @@ for i in $CMD; do
             echo "  append $(blue install) to install all dependencies"
             echo "  append $(blue remove) to uninstall all dependencies"
             echo "      $(red "you may miss some of the uninstalled tools")"
-            echo "  append $(blue exclude) <packages> to exclude some packages"
+            echo "  append $(blue -y) to not ask for confirmation"
             echo
             echo "  for example $(green ./util) $(blue "install exclude qemu") installs all needed packages except qemu"
             echo
             echo "  supported platforms:"
-            echo "      $(red Fedora Linux), $(red Arch Linux), $(red Ubuntu), $(red Debian) $(red CentOS)"
+            echo "      $(green Fedora Linux), $(red Arch Linux), $(red Ubuntu), $(red Debian) $(red CentOS)"
             echo "      $(green MacOS) (brew), $(red FreeBSD), $(red OpenBSD)"
         ;;
         change)
@@ -98,9 +92,15 @@ for i in $CMD; do
         ;;
         mkiso)
             echo "$(green ./util) $(blue mkiso)"
-            echo "  $(yellow builds you a bootable ISO) ($(red "the OS kernel must be built"))"
+            echo "  $(yellow 'builds you a bootable ISO') ($(red "the OS kernel must be built"))"
             echo 
             echo "  usage: $(green ./util) $(blue "mkiso <arch/s>")"
+        ;;
+        check)
+            echo "$(green ./util) $(blue check)"
+            echo "  $(yellow 'checks for errors')"
+            echo
+            echo "  usage: $(green ./util) $(blue 'check <arch/s>')"
         ;;
         *)
             if [ "$1" != $i ]; then

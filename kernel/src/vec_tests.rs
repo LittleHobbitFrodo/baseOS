@@ -1,7 +1,9 @@
 
 
-use ministd::{test_only, testing, String, Vec, vec};
+use ministd::{eprintln, test_only, testing, vec, String, Vec};
 use ministd::{print, println};
+#[test_only]
+use ministd::DROP_COUNTER;
 
 #[testing(VEC)]
 fn with_capacity() {
@@ -22,6 +24,10 @@ fn with_capacity() {
     vec.push(11);
     assert_eq!(vec.len(), 11);
     assert!(vec.capacity() >= 11);
+
+
+
+
 }
 
 #[testing(VEC)]

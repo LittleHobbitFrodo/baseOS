@@ -37,8 +37,9 @@ fn min_3(v1: usize, v2: usize, v3: usize) -> usize {
 ///     - set to 0 to enable **geometrical growth**
 /// 3. `ALIGN` - defines custom alignment of the data
 ///     - set to 0 to use `align_of::<T>()`
+///     - if used value is invalid, the `DynamicB uffer` will use the closest valid value
 #[repr(C)]
-pub(crate) struct DynamicBuffer<T: Sized, const STEP: usize, const ALIGN: usize = 0> {
+pub struct DynamicBuffer<T: Sized, const STEP: usize, const ALIGN: usize = 0> {
     data: NonNull::<u8>,
     cap: u32,
     pub size: u32,
@@ -49,16 +50,19 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
 
 
     /// The real alignment of the data
-    const ALGN: usize = if ALIGN == 0 {
+    const ALGN: usize = if ALIGN < align_of::<T>() {
         align_of::<T>()
-    } else if ALIGN.is_power_of_two() && ALIGN >= align_of::<T>() {
-        ALIGN
     } else {
-        0
+        if !ALIGN.is_power_of_two() {
+            ALIGN.next_power_of_two()
+        } else {
+            ALIGN
+        }
     };
 
+
     /// Indicates whether the `ALIGN` generic parameter is valid
-    const VALID: bool = ALIGN == 0 || (ALIGN.is_power_of_two() && ALIGN >= align_of::<T>() );
+    //const VALID: bool = ALIGN == 0 || (ALIGN.is_power_of_two() && ALIGN >= align_of::<T>() );
 
     /// returns `Layout` describing memory layout for `self`
     /// - use `DynamicBuffer::layout_for_exact(capacity)` for other instances
@@ -68,28 +72,20 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
 
     /// Constructs empty DynamicBuffer with no allocated data
     pub const fn empty() -> Self {
-        if Self::VALID {
-            Self {
-                data: NonNull::dangling(),
-                cap: 0,
-                size: 0,
-                _marker: PhantomData,
-            }
-        } else {
-            panic!("ALIGN must be either `0` or power of 2 and must be greater than or equal to `align_of::<T>()`");
+        Self {
+            data: NonNull::dangling(),
+            cap: 0,
+            size: 0,
+            _marker: PhantomData,
         }
     }
 
     pub(crate) const fn from_raw(data: NonNull<T>, cap: u32, size: u32) -> DynamicBuffer<T, STEP, ALIGN> {
-        if Self::VALID {
-            Self {
-                data: unsafe { NonNull::new_unchecked(data.as_ptr() as *mut u8) },
-                cap,
-                size,
-                _marker: PhantomData,
-            }
-        } else {
-            panic!("ALIGN must be either `0` or power of 2 and must be greater than or equal to `align_of::<T>()`");
+        Self {
+            data: unsafe { NonNull::new_unchecked(data.as_ptr() as *mut u8) },
+            cap,
+            size,
+            _marker: PhantomData,
         }
     }
 
@@ -98,23 +94,19 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// - `size = 0`
     /// - `capacity` is aligned to `STEP`
     pub fn with_capacity(capacity: usize) -> Self {
-        if Self::VALID {
-            let cap = Self::new_capacity(capacity);
+        let cap = Self::new_capacity(capacity);
 
-            let l = Self::layout_for_exact(cap);
+        let l = Self::layout_for_exact(cap);
 
-            let data = unsafe { ALLOCATOR.alloc(l) };
+        let data = unsafe { ALLOCATOR.alloc(l) };
 
-            assert!(!data.is_null(), "failed to allocate data");
+        assert!(!data.is_null(), "failed to allocate data");
 
-            Self {
-                data: unsafe { NonNull::new_unchecked(data) },
-                cap: cap as u32,
-                size: 0,
-                _marker: PhantomData
-            }
-        } else {
-            panic!("ALIGN must be either `0` or power of 2 and must be greater than or equal to `align_of::<T>()`");
+        Self {
+            data: unsafe { NonNull::new_unchecked(data) },
+            cap: cap as u32,
+            size: 0,
+            _marker: PhantomData
         }
     }
 
@@ -123,26 +115,22 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// - `size = 0`
     /// - `capacity` is aligned to `STEP`
     pub fn try_with_capacity(capacity: usize) -> Result<Self, ()> {
-        if Self::VALID {
-            let cap = Self::new_capacity(capacity);
+        let cap = Self::new_capacity(capacity);
 
-            let l = Self::layout_for_exact(cap);
+        let l = Self::layout_for_exact(cap);
 
-            let data = unsafe { ALLOCATOR.alloc(l) };
+        let data = unsafe { ALLOCATOR.alloc(l) };
 
-            if data.is_null() {
-                return Err(());
-            }
-
-            Ok(Self {
-                data: unsafe { NonNull::new_unchecked(data) },
-                cap: cap as u32,
-                size: 0,
-                _marker: PhantomData
-            })
-        } else {
-            panic!("ALIGN must be either `0` or power of 2 and must be greater than or equal to `align_of::<T>()`");
+        if data.is_null() {
+            return Err(());
         }
+
+        Ok(Self {
+            data: unsafe { NonNull::new_unchecked(data) },
+            cap: cap as u32,
+            size: 0,
+            _marker: PhantomData
+        })
     }
 
 
@@ -151,21 +139,17 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// - `size = 0`
     /// - `capacity` is not aligned to `STEP`
     pub fn with_exact_capacity(capacity: usize) -> Self {
-        if Self::VALID {
-            let l = Self::layout_for_exact(capacity);
+        let l = Self::layout_for_exact(capacity);
 
-            let data = unsafe { ALLOCATOR.alloc(l) };
+        let data = unsafe { ALLOCATOR.alloc(l) };
 
-            assert!(!data.is_null(), "failed to allocate data");
+        assert!(!data.is_null(), "failed to allocate data");
 
-            Self {
-                data: unsafe { NonNull::new_unchecked(data) },
-                cap: capacity as u32,
-                size: 0,
-                _marker: PhantomData
-            }
-        } else {
-            panic!("ALIGN must be either `0` or power of 2 and must be greater than or equal to `align_of::<T>()`");
+        Self {
+            data: unsafe { NonNull::new_unchecked(data) },
+            cap: capacity as u32,
+            size: 0,
+            _marker: PhantomData
         }
     }
 
@@ -174,47 +158,39 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// - `size = 0`
     /// - `capacity` is not aligned to `STEP`
     pub fn try_with_exact_capacity(capacity: usize) -> Result<Self, ()> {
-        if Self::VALID {
-            let l = Self::layout_for_exact(capacity);
+        let l = Self::layout_for_exact(capacity);
 
-            let data = unsafe { ALLOCATOR.alloc(l) };
+        let data = unsafe { ALLOCATOR.alloc(l) };
 
-            if data.is_null() {
-                return Err(());
-            }
-
-            Ok(Self {
-                data: unsafe { NonNull::new_unchecked(data) },
-                cap: capacity as u32,
-                size: 0,
-                _marker: PhantomData
-            })
-        } else {
-            panic!("ALIGN must be either `0` or power of 2 and must be greater than or equal to `align_of::<T>()`");
+        if data.is_null() {
+            return Err(());
         }
+
+        Ok(Self {
+            data: unsafe { NonNull::new_unchecked(data) },
+            cap: capacity as u32,
+            size: 0,
+            _marker: PhantomData
+        })
     }
 
     /// Constructs `DynamicBuffer<T>` with some elements allocated and zeroed memory
     /// - **panics** if allocation fails
     /// - `size = 0`
     pub fn with_capacity_zeroed(capacity: usize) -> Self {
-        if Self::VALID {
-            let cap = Self::new_capacity(capacity);
+        let cap = Self::new_capacity(capacity);
 
-            let l = Self::layout_for_exact(cap);
-            
-            let data = unsafe { ALLOCATOR.alloc_zeroed(l) };
+        let l = Self::layout_for_exact(cap);
+        
+        let data = unsafe { ALLOCATOR.alloc_zeroed(l) };
 
-            assert!(!data.is_null(), "failed to allocate data");
+        assert!(!data.is_null(), "failed to allocate data");
 
-            Self {
-                data: unsafe { NonNull::new_unchecked(data) },
-                cap: cap as u32,
-                size: 0,
-                _marker: PhantomData
-            }
-        } else {
-            panic!("ALIGN must be either `0` or power of 2 and must be greater than or equal to `align_of::<T>()`");
+        Self {
+            data: unsafe { NonNull::new_unchecked(data) },
+            cap: cap as u32,
+            size: 0,
+            _marker: PhantomData
         }
     }
 
@@ -222,26 +198,22 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// - returns `Err` if allocation fails
     /// - `size = 0`
     pub fn try_with_capacity_zeroed(capacity: usize) -> Result<Self, ()> {
-        if Self::VALID {
-            let cap = Self::new_capacity(capacity);
+        let cap = Self::new_capacity(capacity);
 
-            let l = Self::layout_for_exact(cap);
+        let l = Self::layout_for_exact(cap);
 
-            let data = unsafe { ALLOCATOR.alloc(l) };
+        let data = unsafe { ALLOCATOR.alloc(l) };
 
-            if data.is_null() {
-                return Err(());
-            }
-
-            Ok(Self {
-                data: unsafe { NonNull::new_unchecked(data) },
-                cap: cap as u32,
-                size: 0,
-                _marker: PhantomData
-            })
-        } else {
-            panic!("ALIGN must be either `0` or power of 2 and must be greater than or equal to `align_of::<T>()`");
+        if data.is_null() {
+            return Err(());
         }
+
+        Ok(Self {
+            data: unsafe { NonNull::new_unchecked(data) },
+            cap: cap as u32,
+            size: 0,
+            _marker: PhantomData
+        })
     }
 
     /// Resizes (reallocates) the buffer to certain size
@@ -331,6 +303,7 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// - if `self.is_empty()` allocates new data
     /// - **panics** if allocation fails
     /// - **Copies exactly `self.size` elements to the new location**
+    ///   - Copies all elements if `self.size > self.capacity()`
     pub fn resize_exact(&mut self, size: usize) {
 
         if size == self.capacity() {
@@ -365,6 +338,7 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// - if `self.is_empty()` allocates new data
     /// - **panics** if allocation fails
     /// - **Copies exactly `self.size` elements to the new location**
+    ///   - Copies all elements if `self.size > self.capacity()`
     pub fn try_resize_exact(&mut self, size: usize) -> Result<(), ()> {
 
         let layout = Self::layout_for_exact(size);
@@ -398,9 +372,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// - this function always reallocates memory
     /// - **panics** if allocation fails
     /// - **Copies exactly `self.size` elements to the new location**
+    ///   - Copies all elements if `self.size > self.capacity()`
     pub fn expand(&mut self) {
 
-        let wanted = Self::cap_next(self.capacity());
+        let wanted = Self::next_capacity(self.capacity());
 
         let layout = Self::layout_for_exact(wanted);
 
@@ -428,9 +403,10 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// - this function always reallocates memory
     /// - returns `Err` if allocation fails
     /// - **Copies exactly `self.size` elements to the new location**
+    ///   - Copies all elements if `self.size > self.capacity()`
     pub fn try_expand(&mut self) -> Result<(), ()> {
 
-        let wanted = Self::cap_next(self.capacity());
+        let wanted = Self::next_capacity(self.capacity());
 
         let layout = Self::layout_for_exact(wanted);
 
@@ -461,9 +437,11 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// Expands the `capacity` by `STEP * steps` elements
     /// - this function always reallocates memory
     /// - **panics** if allocation fails
+    /// - **Copies exactly `self.size` elements to the new location**
+    ///   - Copies all elements if `self.size > self.capacity()`
     pub fn expand_by(&mut self, steps: usize) {
 
-        let wanted = Self::cap_next(self.capacity() + (STEP * steps));
+        let wanted = Self::next_capacity(self.capacity() + (STEP * steps));
 
         let layout = Self::layout_for_exact(wanted);
 
@@ -490,9 +468,11 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// Tries to expanf the `capacity` by `STEP * steps` elements
     /// - this function always reallocates memory
     /// - returns `Err` if allocation fails
+    /// - **Copies exactly `self.size` elements to the new location**
+    ///   - Copies all elements if `self.size > self.capacity()`
     pub fn try_expand_by(&mut self, steps: usize) -> Result<(), ()> {
 
-        let wanted = Self::cap_next(self.capacity() + (STEP * steps));
+        let wanted = Self::next_capacity(self.capacity() + (STEP * steps));
 
         let layout = Self::layout_for_exact(wanted);
 
@@ -523,20 +503,17 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     /// Constructs new `DynamicBuffer` from raw parts
     /// - **warning**: may be potentially unsafe
     pub fn from_raw_parts(ptr: NonNull<T>, layout: Layout) -> Self {
-        if Self::VALID {
-            Self {
-                data: unsafe { NonNull::new_unchecked(ptr.as_ptr() as *mut u8) },
-                cap: (layout.size()/size_of::<T>()) as u32,
-                size: 0,
-                _marker: PhantomData
-            }
-        } else {
-            panic!("ALIGN must be either `0` or power of 2");
+        Self {
+            data: unsafe { NonNull::new_unchecked(ptr.as_ptr() as *mut u8) },
+            cap: (layout.size()/size_of::<T>()) as u32,
+            size: 0,
+            _marker: PhantomData
         }
     }
 
     /// Decomposes `self` and returns individual parts of the `DynamicBuffer`
     /// - returns `(ptr, size, capacity)`
+    /// - **panics** if no data is allocated
     pub unsafe fn into_parts(self) -> (NonNull<T>, usize, usize) {
         if self.capacity() == 0 {
             panic!("no memory allocated");
@@ -563,37 +540,41 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
 
 impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALIGN> {
 
-    /// Returns the `STEP` constant for this instance
+    /// Returns the `STEP` generic for this instance
     pub const fn step(&self) -> usize { STEP }
+
+    /// Returns the `STEP` generic for this type
+    pub const fn step_of() -> usize { STEP }
 
     /// Checks if has any data allocated
     pub const fn has_data(&self) -> bool { self.capacity() > 0 }
 
-    /// Returns alignment of this `DynamicBuffer`
+    /// Returns alignment of this `DynamicBuffer` instance
     pub const fn align(&self) -> usize { Self::ALGN }
 
-    
+    /// Returns alignment for this generic `DynamicBuffer` type
+    pub const fn align_of() -> usize { Self::ALGN }
 
     /// Describes memory layout for some capacity
     /// 
     /// - to be clear: (this may change in next versions)
     /// ```
-    /// Layout::from_size_align_unchecked(size_of::<T>() * Self::cap_next(capacity), align_of::<T>())
+    /// Layout::from_size_align_unchecked(size_of::<T>() * Self::cap_next(capacity), Self::align_of())
     /// ``````
     pub const fn layout_for(capacity: usize) -> Layout {
         //  ALGN should hold correct value
-        unsafe { Layout::from_size_align_unchecked(size_of::<T>() * capacity, Self::ALGN) }
+        unsafe { Layout::from_size_align_unchecked(size_of::<T>() * capacity, Self::align_of()) }
     }
 
     /// Describes memory layout for some capacity without aligning to `STEP`
     /// 
     /// - to be clear: (this may change in next version)
     /// ```
-    /// Layout::from_size_align_unchecked(size_of::<T>() * capacity, align_of::<T>())
+    /// Layout::from_size_align_unchecked(size_of::<T>() * capacity, Self::align_of())
     /// ```
     pub const fn layout_for_exact(capacity: usize) -> Layout {
         //  ALGN should hold correct value
-        unsafe { Layout::from_size_align_unchecked(size_of::<T>() * capacity, Self::ALGN) }
+        unsafe { Layout::from_size_align_unchecked(size_of::<T>() * capacity, Self::align_of()) }
     }
 
     /// aligns the capacity up to next generic `STEP`
@@ -607,7 +588,7 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     ///     (cap + 1).next_multiple_of(STEP)
     /// }
     /// ```
-    pub const fn cap_next(cap: usize) -> usize {
+    pub const fn next_capacity(cap: usize) -> usize {
         if STEP == 0 {
             (cap + 1).next_power_of_two()
         } else {
@@ -627,9 +608,7 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> DynamicBuffer<T, STEP, ALI
     }
 
     /// Returns number of elements allocated in the buffer
-    pub const fn capacity(&self) -> usize {
-        self.cap as usize
-    }
+    pub const fn capacity(&self) -> usize { self.cap as usize }
 
     /// Indicates if no data is allocated
     pub const fn is_empty(&self) -> bool {

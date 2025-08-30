@@ -5,7 +5,7 @@ source "$PWD/files/base/scripts.conf"
 archs=""
 debug=false
 custom=false
-arch_set=false
+
 if [ "$#" != 0 ]; then
     for arg in "$@"; do
         a="$(echo $arg | tr '[:upper:]' '[:lower:]')"
@@ -18,17 +18,13 @@ if [ "$#" != 0 ]; then
             ;;
             x86_64)
                 archs="$archs x86_64"
-                arch_set=true
             ;;
             arm64)
                 archs="$archs aarch64"
-                arch_set=true
             ;;
         esac
     done
-fi
-
-if [ "$arch_set" = false ]; then
+else
     archs="$arch"
 fi
 
@@ -54,7 +50,6 @@ for a in $archs; do
 
 
     #   compile rust code
-
     cd ./kernel
         if [ "$custom" = true ]; then
             $compiler build $cargo_params --target "$(get_arch $a)-unknown-none" --features "custom_testing"

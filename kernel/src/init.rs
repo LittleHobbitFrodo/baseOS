@@ -6,12 +6,10 @@
 
 use ministd::entry;
 use ministd::init;
-use ministd::{Vec, vec};
-use ministd::RENDERER;
 use ministd::{panic_fmt, print, println};
 use ministd::{testing, test_only};
-use ministd::String;
-use ministd::renderer::MinistdRenderer;
+
+
 
 
 
@@ -34,12 +32,14 @@ fn init() -> Result<(), ()> {
         }
     }
 
+    //  initialize memory layout metadata
+    init::memory();
+
     println!("hello world!");
 
-    
 
     //  run all tests
-    ministd::run_tests!("VEC", false);
+    ministd::run_tests!(false);
 
     Ok(())
 
@@ -93,6 +93,7 @@ fn test_in_emulator() {
 
 /// This is how you can name a group of tests
 /// - the group must be tested with the `run_tests!(<g name>)` macro
+/// - the OS must be built with `./util test custom` command
 #[testing(SOME)]
 fn test_some() {
     let something: Option<&'static str> = Some("something");

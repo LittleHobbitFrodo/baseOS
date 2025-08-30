@@ -1,5 +1,5 @@
 //	mem/mod.rs (ministd crate)
-//	this file originally belonged to baseOS project
+//	this file originally belonged to the baseOS project
 //		an OS template on which to build
 
 /// this file provides basic memory-related functionalities
@@ -30,6 +30,9 @@ pub use core::mem::needs_drop;
 
 pub mod readonly;
 pub use readonly::ReadOnly;
+
+pub mod kernel;
+
 #[cfg(all(feature="allocator", feature="spin"))]
 pub mod alloc;
 
@@ -38,7 +41,7 @@ pub mod boxed;
 #[cfg(all(feature="box", feature="allocator", feature="spin"))]
 pub mod array;
 #[cfg(all(feature="allocator", feature="spin"))]
-pub mod dynamic_buffer;
+mod dynamic_buffer;
 
 #[cfg(all(feature="string", feature="allocator", feature="spin"))]
 pub mod string;
@@ -48,7 +51,7 @@ pub mod vec;
 pub mod rc;
 
 #[cfg(all(feature="allocator", feature="spin"))]
-pub(crate) use dynamic_buffer::DynamicBuffer;
+pub use dynamic_buffer::DynamicBuffer;
 
 pub use crate::convert::Align;
 pub use core::mem::{ManuallyDrop, MaybeUninit};
@@ -231,3 +234,6 @@ impl<const ALIGN: usize> Region<ALIGN> {
     }
 
 }
+
+
+

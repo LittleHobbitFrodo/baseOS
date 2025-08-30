@@ -7,10 +7,10 @@ IFS=" "
 archs=""
 if [ "$#" != 0 ]; then
     for arg in "$@"; do
-        a = "$(echo $arg | tr '[:upper:]' '[:lower:]')"
+        a="$(echo $arg | tr '[:upper:]' '[:lower:]')"
         case $a in
             x86_64)
-                archs="$archs x64_64"
+                archs="$archs x86_64"
             ;;
             arm64)
                 archs="$archs aarch64"
@@ -23,6 +23,8 @@ fi
 
 cargo_params="--target-dir bin --verbose --target"
 
+
+#   check for errors
 cd ./kernel
 IFS=" "
 for a in $archs; do

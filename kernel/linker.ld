@@ -20,30 +20,40 @@ SECTIONS
     /* and because that is what the Limine spec mandates. */
     /* Any address in this region will do, but often 0xffffffff80000000 is chosen as */
     /* that is the beginning of the region. */
+
+
     . =    0xffffffff80000000;
-    KERNEL_START = .;
+    __KERNEL_START = .;     /*used by the ministd to identify address of kernel*/
+    __TEXT_START = .;
     .text : {
         *(.text .text.*)
     } :text
+    __TEXT_END = .;
 
     /* Move to the next memory page for .rodata */
     . += CONSTANT(MAXPAGESIZE);
 
+    __RODATA_START = .;
     .rodata : {
         *(.rodata .rodata.*)
     } :rodata
+    __RODATA_END = .;
 
     /* Move to the next memory page for .data */
     . += CONSTANT(MAXPAGESIZE);
 
+    __DATA_START = .;
     .data : {
         *(.data .data.*)
     } :data
+    __DATA_END = .;
 
+    __DYNAMIC_START = .;
     /* Dynamic section for relocations, both in its own PHDR and inside data PHDR */
     .dynamic : {
         *(.dynamic)
     } :data :dynamic
+    __DYNAMIC_END = .;
 
     . = ALIGN(8);
     __start_tests = .;
@@ -52,6 +62,7 @@ SECTIONS
     }
     __stop_tests = .;
 
+    __BSS_START = .;
     /* NOTE: .bss needs to be the last thing mapped to :data, otherwise lots of */
     /* unnecessary zeros will be written to the binary. */
     /* If you need, for example, .init_array and .fini_array, those should be placed */
@@ -61,17 +72,9 @@ SECTIONS
         *(COMMON)
     } :data
 
-    KERNEL_END = .;
+    __BSS_END = .;
 
-    /*.stack : {
-        STACK_START = .;
-        . = . + 8192;
-        STACK_END = .;
-    }*/
-
-    /*.heap : {
-		*(.heap)
-    } :data*/
+    __KERNEL_END = .;
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
  
