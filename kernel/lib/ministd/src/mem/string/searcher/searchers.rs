@@ -4,7 +4,7 @@
 
 use super::{ReverseSearcher, SearchStep, Searcher};
 
-use super::{find_from, rfind_from};
+use super::find_from;
 
 /// Associated type for <char as Pattern>::Searcher<'a>.
 #[derive(Clone, Debug, PartialEq)]
@@ -337,7 +337,7 @@ where F: FnMut(u8) -> bool {
     haystack: &'haystack [u8],
     predicate: F,
     finger: u32,
-    finger_back: u32,
+    //finger_back: u32,
     next_match: bool,
 }
 
@@ -351,7 +351,7 @@ where F: FnMut(u8) -> bool + Clone {
             haystack: haystack.as_bytes(),
             predicate: needle.clone(),
             finger: 0,
-            finger_back: (haystack.len() - 1) as u32,
+            //finger_back: (haystack.len() - 1) as u32,
             next_match: false,
         }
     }

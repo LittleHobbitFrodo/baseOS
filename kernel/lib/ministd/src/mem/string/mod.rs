@@ -9,6 +9,7 @@ pub use pattern::Pattern;
 pub use searcher::{Searcher, ReverseSearcher, SearchStep};
 
 use crate::mem::DynamicBuffer;
+use crate::Cow;
 
 #[cfg(all(feature="allocator", feature="spin", feature="spin", feature="string"))]
 use crate::panic_fmt;
@@ -1084,6 +1085,19 @@ impl<const STEP: usize> From<&str> for String<STEP> {
     }
 }
 
+impl<const STEP: usize> From<&[u8]> for String<STEP> {
+    fn from(value: &[u8]) -> Self {
+        let mut data = DynamicBuffer::with_capacity(value.len());
+        unsafe {
+            ptr::copy_nonoverlapping(value.as_ptr(), data.as_ptr(), value.len());
+        }
+
+        data.size = value.len() as u32;
+
+        Self { data }
+    }
+}
+
 impl<const STEP: usize> Deref for String<STEP> {
     type Target = str;
     fn deref(&self) -> &Self::Target {
@@ -1167,3 +1181,63 @@ impl<'l, const STEP: usize> PartialEq<String<STEP>> for &'l str {
     }
 }
 
+
+
+impl crate::Borrow<str> for String {
+    #[inline]
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl crate::BorrowMut<str> for String {
+    #[inline]
+    fn borrow_mut(&mut self) -> &mut str {
+        self.as_mut_str()
+    }
+}
+
+
+impl<'l> From<&'l String> for Cow<'l, str> {
+    fn from(value: &'l String) -> Self {
+        Cow::Borrowed(value.as_str())
+    }
+}
+
+impl<'l, const STEP: usize> From<Cow<'l, str>> for String<STEP> {
+    /// Converts `Cow<str>` into String
+    /// - reallocates the buffer
+    fn from(value: Cow<'l, str>) -> Self {
+        let mut s: String<STEP> = String::with_capacity(value.len());
+        unsafe {
+            s.set_len(value.len());
+            let ptr = value.as_ref().as_ptr();
+            copy_nonoverlapping(ptr, s.as_mut_ptr(), value.len());
+        }
+        s
+    }
+}
+
+
+impl<'l> From<&'l String> for Cow<'l, String> {
+    #[inline]
+    fn from(value: &'l String) -> Self {
+        Cow::Borrowed(value)
+    }
+}
+
+
+
+
+pub trait ToString {
+    fn to_string(&self) -> String;
+}
+
+
+impl<T: Display> ToString for T {
+    fn to_string(&self) -> String {
+        let mut s: String = String::new();
+        let _ = write!(&mut s, "{self}");
+        s
+    }
+}

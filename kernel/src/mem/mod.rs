@@ -2,10 +2,10 @@
 //  this file originally belonged to baseOS project
 //      on OS template on which to build
 
-use ministd::{alloc::*, mem::Region, MutexGuard};
+use ministd::mem::Region;
 use bootloader::{MEMMAP, HHDM};
 use limine_rs::memory_map::EntryType;
-use ministd::mem::{MB, PAGE_ALIGN};
+use ministd::mem::MB;
 use ministd::{oom, region_finder};
 
 /// `mem::find_heap_region` function is used by the `ministd::init::allocator()` to find suitable place in the memory for heap

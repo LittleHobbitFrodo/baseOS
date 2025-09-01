@@ -2,7 +2,7 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
-use core::{cell::Cell, mem::MaybeUninit, ops::Deref, ops::DerefMut};
+use core::{cell::Cell, mem::MaybeUninit, ops::Deref};
 use core::hint::assert_unchecked;
 
 

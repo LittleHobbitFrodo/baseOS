@@ -36,6 +36,9 @@ pub use renderer::{RENDERER, Color};
 
 #[cfg(all(feature="string", feature="allocator", feature="spin"))]
 pub use mem::string::{self, String};
+#[cfg(all(feature="string", feature="allocator", feature="spin"))]
+pub use mem::string::ToString;
+
 
 #[cfg(all(feature="vector", feature="allocator", feature="spin"))]
 pub use mem::vec::{self, Vec};
@@ -50,6 +53,9 @@ pub use mem::alloc::{self, ALLOCATOR, Allocator};
 
 #[cfg(all(feature="rc", feature="allocator", feature="spin"))]
 pub use mem::rc::Rc;
+
+pub mod borrow;
+pub use borrow::*;
 
 //  local crates
 pub use bootloader;

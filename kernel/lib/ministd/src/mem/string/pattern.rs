@@ -4,8 +4,6 @@
 
 //  this module provides the string `Pattern` trait that is used to search for patterns in strings
 
-use core::{hash::Hash, mem::ManuallyDrop};
-
 use super::{searcher::{CharPredicateSearcher, CharSearcher, StrSearcher}, ReverseSearcher, Searcher};
 
 pub trait Pattern: Sized {

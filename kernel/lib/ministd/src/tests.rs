@@ -4,7 +4,7 @@
 
 use crate::RENDERER;
 use crate::renderer::MinistdRenderer;
-use crate::{eprintln, eprint, println, print};
+use crate::{eprint, println};
 
 unsafe extern "C" {
     pub(crate) static __start_tests: usize;

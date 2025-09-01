@@ -86,12 +86,13 @@ Please note that some development **dependencies** must be **built from source**
     - used Spin crate
   - [X] Panicking
   - [X] Heap - buddy_system_allocator
-  - [X] String (untested)
-  - [X] Box - `Array` is used for allocation of arrays
-  - [X] Vector
-  - [X] HashMap - using `hashbrown` from the std
-  - [x] Rc
-  - [ ] Arc
+  - [X] `String`
+  - [X] `Box` - `Array` is used for allocation of arrays
+  - [X] `Vec`
+  - [X] `HashMap` - using `hashbrown` from the std
+  - [x] `Rc`
+  - [ ] `Arc`
+  - [ ] `Cow`
 
 #### Maybes
 - STDlib

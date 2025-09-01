@@ -39,7 +39,10 @@ for a in $archs; do
 
     $compiler check $cargo_params "$(get_arch $a)-unknown-none"
 
-    if [ "$?" != 0 ]; then
+    if [ "$?" == 0 ]; then
+        echo
+        echo "$(green "SUCCESS")"
+    else
         error "check for $a failed"
         exit 2
     fi

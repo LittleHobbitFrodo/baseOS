@@ -5,6 +5,7 @@ source "$PWD/files/base/scripts.conf"
 archs=""
 debug=false
 custom=false
+arch_set=false
 
 if [ "$#" != 0 ]; then
     for arg in "$@"; do
@@ -18,12 +19,19 @@ if [ "$#" != 0 ]; then
             ;;
             x86_64)
                 archs="$archs x86_64"
+                arch_set=true
             ;;
             arm64)
                 archs="$archs aarch64"
+                arch_set=true
             ;;
         esac
     done
+
+    if [ "$arch_set" = false ]; then
+        archs="$arch"
+    fi
+
 else
     archs="$arch"
 fi

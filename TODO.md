@@ -5,18 +5,17 @@ Yes, this is my todolist. Take a look if interested.
 
 
 ## Base
-  - when changing kernel name limine configs must be updated
-    - once done update mkiso to work with it
-  - add assembler support
+  1. check the `change` subcommand
+    - make it change kernel name in the limine cfgs
+  2. add assembler support
     - assembler for each architecture
     - specified as parameter for conf subcommand?
-  - instead of using paths to linker, compiler etc, the path will be pointing to symlinks pointing to the tools
 
 ## Rust
 
-- Add the `Cow` type
-- rewrite unit tests (swap panic handler for tests instead of returning Result)
-
-### Ministd
-- Add support for aarch64
+1. Add the `Cow` type
+2. Add the `Arc` type
+3. Add module for OS and kernel info
+    - add build GUID and time strings
+4. Add support for aarch64
 

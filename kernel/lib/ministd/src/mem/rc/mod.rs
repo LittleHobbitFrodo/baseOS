@@ -11,8 +11,6 @@ use core::marker::PhantomData;
 use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ptr::{drop_in_place, write_bytes};
 use core::{cell::Cell, ptr::NonNull};
-use core::ops::Deref;
-use core::hint::assert_unchecked;
 
 mod rc_inner;
 
@@ -21,7 +19,7 @@ pub(crate) use rc_inner::*;
 pub mod weak;
 pub use weak::*;
 
-use crate::{alloc::*, TryClone};
+use crate::{alloc::*, TryClone, Cow, ToOwned};
 
 /// A single-threaded reference-counting pointer
 pub struct Rc<T: Sized> {
@@ -452,3 +450,18 @@ impl<T> Pointer for Rc<T> {
 }
 
 impl<T> Unpin for Rc<T> {}
+
+
+impl<'a, B> From<Cow<'a, B>> for Rc<B>
+where
+    B: ToOwned + Sized,
+    Rc<B>: From<&'a B> + From<B::Owned>,
+{
+    #[inline]
+    fn from(cow: Cow<'a, B>) -> Rc<B> {
+        match cow {
+            Cow::Borrowed(s) => Rc::from(s),
+            Cow::Owned(s) => Rc::from(s),
+        }
+    }
+}

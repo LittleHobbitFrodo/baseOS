@@ -11,8 +11,6 @@ use ministd::{testing, test_only};
 
 
 
-
-
 /// This function is here to initialize your kernel
 /// s
 /// you can initialize various kernel functions and submodules here
@@ -39,7 +37,7 @@ fn init() -> Result<(), ()> {
 
 
     //  run all tests
-    ministd::run_tests!(false);
+    ministd::run_tests!("COW", false);
 
     Ok(())
 
@@ -112,5 +110,6 @@ fn test_some() {
     }
 
 }
+
 
 

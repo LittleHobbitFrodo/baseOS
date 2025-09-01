@@ -15,8 +15,8 @@ use core::slice::{self, from_raw_parts, from_raw_parts_mut};
 use core::ops::{Bound::*, Deref, DerefMut, Index, IndexMut, Range, RangeBounds};
 use core::cmp::Ordering::*;
 
-use crate::mem::{Align, DynamicBuffer};
-use crate::{Array, TryClone};
+use crate::mem::DynamicBuffer;
+use crate::{ToOwned, TryClone, Cow};
 
 #[cfg(all(feature="allocator", feature="spin", feature="box"))]
 use crate::Box;
@@ -1869,7 +1869,8 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
         (m.data.data(), m.len(), m.capacity())
     }
 
-    pub(crate) unsafe fn into_dynamic_buffer(self) -> DynamicBuffer<T, STEP, ALIGN> {
+    
+    /*pub(crate) unsafe fn into_dynamic_buffer(self) -> DynamicBuffer<T, STEP, ALIGN> {
         unsafe {
             let (ptr, size, cap) = self.into_parts();
             DynamicBuffer::from_raw(ptr, cap as u32, size as u32)
@@ -1880,7 +1881,7 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Vec<T, STEP, ALIGN> {
 
     pub(crate) const unsafe fn from_dynamic_buffer(db: DynamicBuffer<T, STEP, ALIGN>) -> Self {
         Self { data: db }
-    }
+    }*/
 
 
 
@@ -2266,6 +2267,29 @@ impl<T, const STEP: usize, const ALIGN: usize> Hash for Vec<T, STEP, ALIGN>
 }
 
 //impl<T, const STEP: usize, const ALIGN>
+
+
+impl<'a, T: Clone> From<&'a Vec<T>> for Cow<'a, [T]> {
+    fn from(v: &'a Vec<T>) -> Cow<'a, [T]> {
+        Cow::Borrowed(v.as_slice().expect("Vec is empty"))
+    }
+}
+
+impl<'a, T> From<Cow<'a, [T]>> for Vec<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    #[track_caller]
+    fn from(s: Cow<'a, [T]>) -> Vec<T> {
+        s.into_owned()
+    }
+}
+
+impl<'a, T: Clone> From<Vec<T>> for Cow<'a, [T]> {
+    fn from(v: Vec<T>) -> Cow<'a, [T]> {
+        Cow::Owned(v)
+    }
+}
 
 
 
