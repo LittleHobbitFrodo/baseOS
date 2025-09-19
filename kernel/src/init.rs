@@ -6,9 +6,8 @@
 
 use ministd::entry;
 use ministd::init;
-use ministd::{panic_fmt, print, println};
+use ministd::{panic_fmt, println};
 use ministd::{testing, test_only};
-
 
 
 /// This function is here to initialize your kernel
@@ -25,8 +24,10 @@ fn init() -> Result<(), ()> {
     if let Err(msg) = init::allocator() {
         if let Some(msg) = msg {
             panic_fmt!("failed to initialize heap: {msg}")
+            //  panic_fmt! allows you to format panic output
         } else {
             panic!("failed to initialize heap");
+            //  panic cannot format output without std (not ministd)
         }
     }
 
@@ -35,9 +36,9 @@ fn init() -> Result<(), ()> {
 
     println!("hello world!");
 
-
     //  run all tests
-    ministd::run_tests!("COW", false);
+    ministd::run_tests!("SOME", false);
+
 
     Ok(())
 
@@ -110,6 +111,3 @@ fn test_some() {
     }
 
 }
-
-
-

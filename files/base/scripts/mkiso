@@ -39,7 +39,6 @@ fi
 IFS=" "
 for a in $archs; do
 
-
     #   build ISO image for each architecture
     note "creating ISO for $a target"
 
@@ -54,7 +53,7 @@ for a in $archs; do
     fi
 
     mkdir -p $iso/EFI/BOOT $iso/boot/limine
-    cp $(kernel_full $a) $iso/boot/baseOS.bin
+    cp $(kernel_full $a) $iso/boot/$kernel_name.bin
 
     #   apply limine configuration
     if [ $debug == true ]; then

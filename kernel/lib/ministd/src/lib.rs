@@ -24,6 +24,7 @@ pub mod renderer;
 pub mod io;
 pub mod convert;
 pub mod init;
+pub mod sync;
 
 
 #[macro_use]

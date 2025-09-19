@@ -16,9 +16,6 @@ mod rc_inner;
 
 pub(crate) use rc_inner::*;
 
-pub mod weak;
-pub use weak::*;
-
 use crate::{alloc::*, TryClone, Cow, ToOwned};
 
 /// A single-threaded reference-counting pointer
@@ -339,7 +336,7 @@ impl<T> Drop for Rc<T> {
         inner.dec_strong();
         if inner.strong() == 0 {
             unsafe {
-                drop_in_place(inner.data_as_ptr());
+                //drop_in_place(inner.data_as_ptr());
                 ALLOCATOR.delete(NonNull::new_unchecked(inner.as_mut_ptr()));
             }
         }

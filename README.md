@@ -91,8 +91,8 @@ Please note that some development **dependencies** must be **built from source**
   - [X] `Vec`
   - [X] `HashMap` - using `hashbrown` from the std
   - [x] `Rc`
-  - [ ] `Arc`
-  - [ ] `Cow`
+  - [X] `Arc`
+  - [X] `Cow`
 
 #### Maybes
 - STDlib

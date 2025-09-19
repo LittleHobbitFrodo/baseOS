@@ -17,7 +17,7 @@
 
 pub use buddy_system_allocator as allocator;
 use spin::MutexGuard;
-use core::alloc::GlobalAlloc;
+pub use core::alloc::GlobalAlloc;
 pub use core::alloc::Layout;
 use core::mem::MaybeUninit;
 use core::ptr::{copy_nonoverlapping, drop_in_place, null_mut, NonNull};
@@ -41,7 +41,6 @@ impl Allocator {
 
     /// allocates data of type T with proper alignment
     /// - layout: `size: size_of::<T>(), align: align_of::<T>()`
-    #[inline]
     pub unsafe fn allocate<T: Sized>(&self, val: T) -> Result<NonNull<T>, ()> {
         let layout = Layout::new::<T>();
 
@@ -51,7 +50,6 @@ impl Allocator {
             return Err(());
         }
 
-
         unsafe {
             *data = val;
         }
@@ -60,9 +58,14 @@ impl Allocator {
 
     }
 
+    /// Allocates uninitialized memory based on layout
+    #[inline]
+    pub unsafe fn allocate_layout<T: Sized>(&self, layout: Layout) -> Result<NonNull<T>, ()> {
+        NonNull::new(unsafe { self.alloc(layout) as *mut T }).ok_or(())
+    }
+
     /// allocates uninitialized data of type T with proper alignment
     /// - layout: `size: size_of::<T>(), align: align_of::<T>()`
-    #[inline]
     pub unsafe fn allocate_uninit<T: Sized>(&self) -> Result<NonNull<MaybeUninit<T>>, ()> {
         let layout = unsafe { Layout::from_size_align_unchecked(size_of::<T>(), align_of::<T>()) };
         

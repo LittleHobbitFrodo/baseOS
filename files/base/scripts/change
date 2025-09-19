@@ -2,38 +2,82 @@
 
 source "$PWD/files/base/scripts.conf"
 
+# ./util change OS name CustomOS
+# ./util change kernel version 1.1.1
+
+#   1 - change in <file>.conf
+#   2 - change in util.conf
+#   3 - change in bootloader/configs/*
+#   4 - change built kernel and img name
 
 if [ "$#" -lt 3 ]; then
-    error "$(blue change): expected at least 3 parameters"
+    error "$(blue change) expecs at least 3 parameters"
     exit 1
 fi
 
 file="$(echo $1 | tr '[:upper:]' '[:lower:]')"
-#echo file: "$file"
-attr="$(echo $2 | tr '[:upper:]' '[:lower:]')"
-#echo "attr: $attr"
-value="$3"
-#echo "value: $3"
+info="$(echo $2 | tr '[:upper:]' '[lower]')"
+value="$(echo $3)"
 
-if [[ "$attr" != name && "$attr" != version && "$attr" != release ]]; then
-    error "unknown attribue '$attr'"
-    note "expected $(blue "'name', 'version' or 'release'")"
-    exit 1
-fi
-
-#echo "$OS_CONFIG"
-
-
-case $file in
-    os)
-        sed -i '' "s/^$attr=.*/$attr=$value/" "$OS_CONFIG"
-    ;;
+case "$file" in
     kernel)
-        sed -i '' "s/^$attr=.*/$attr=$value/" $KERNEL_CONFIG
+        config_file="$KERNEL_CONFIG"
+    ;;
+    os)
+        config_file="$OS_CONFIG"
     ;;
     *)
-        error "unknown section '$file'"
-        note "expected $(blue "'os' or 'kernel'")"
+        error "unknown subject \"$file\""
         exit 1
     ;;
 esac
+
+#   change util configuration
+case "$info" in
+    "name")
+        echo -e "name=$value\nversion=$kernel_version\nrelease=$kernel_release" > "$config_file"
+
+        case "$file" in
+            os)
+                #   change iso_name attribute in util.conf
+                sed -i "s|iso_name=$os_name|iso_name=$value|g" "$UTIL_CONFIG"
+
+                #   change the default bootloader welcome text
+                sed -i "s|interface_branding: Welcome to $os_name|interface_branding: Welcome to $value|g" bootloader/configs/limine.conf
+                sed -i "s|interface_branding: Welcome to $os_name (DEBUG MODE)|interface_branding: Welcome to $value (DEBUG MODE)|g" bootloader/configs/limine-debug.conf
+
+                #   change bootloader entry names
+                sed -i "s|/$os_name|/$value|g" bootloader/configs/limine.conf
+                sed -i "s|/$os_name|/$value|g" bootloader/configs/limine-debug.conf
+
+                #   change iso name
+                IFS=" "
+                for a in $arch; do
+                    mv ./files/$os_name-$(get_arch $a).iso ./files/$value-$a.iso
+                done
+                
+            ;;
+            kernel)
+                #   change bootloader configuration
+                sed -i "s|boot():/boot/$kernel_name.bin|boot():/boot/$value.bin|g" bootloader/configs/limine.conf
+                sed -i "s|boot():/boot/$kernel_name.bin|boot():/boot/$value.bin|g" bootloader/configs/limine-debug.conf
+
+                #   change kernel binary name
+                IFS=" "
+                for a in $arch; do
+                    mv ./files/$kernel_name-$a.bin ./files/$value-$(get_arch $a).bin
+                done
+            ;;
+        esac
+    ;;
+    version)
+        echo -e "name=$kernel_name\nversion=$value\nrelease=$kernel_release" > "$config_file"
+    ;;
+    release)
+        echo -e "name=$kernel_name\nversion=$kernel_version\nrelease=$value" > "$config_file"
+    ;;
+    *)
+        error "unknown information \"$info\""
+    ;;
+esac
+
