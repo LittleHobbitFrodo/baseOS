@@ -4,6 +4,7 @@
 
 #![no_std]
 #![no_main]
+//#![cfg_attr(feature = "nightly", feature(allocator_api))]
 
 use core::ops::Deref;
 /// # MINISTD crate

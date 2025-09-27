@@ -8,5 +8,3 @@ mod arc;
 pub use arc::Arc;
 
 pub use spin::{Once, Lazy, Mutex, RwLock};
-
-mod lazylock;

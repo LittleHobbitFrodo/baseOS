@@ -1,0 +1,17 @@
+#   This file is here to make rust-analyzer shut up :)
+#       Other files are actually entr
+
+[package]
+name = "util"
+description="convenience program for project management"
+version = "0.1.0"
+edition = "2024"
+license="MIT"
+
+
+
+[profile.release]
+opt-level = 3
+
+[dependencies]
+colored = "3.0.0"

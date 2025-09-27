@@ -10,6 +10,10 @@ use ministd::{panic_fmt, println};
 use ministd::{testing, test_only};
 
 
+
+//  TODO: make the allocator swappable
+
+
 /// This function is here to initialize your kernel
 /// s
 /// you can initialize various kernel functions and submodules here
@@ -37,7 +41,7 @@ fn init() -> Result<(), ()> {
     println!("hello world!");
 
     //  run all tests
-    ministd::run_tests!("SOME", false);
+    ministd::run_tests!();
 
 
     Ok(())

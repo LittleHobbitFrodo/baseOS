@@ -11,3 +11,5 @@ util.conf
 target
 bootloader/build/
 bootloader/limine-cmdline
+files/util/target/
+Cargo.lock

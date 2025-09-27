@@ -7,29 +7,9 @@ source "$PWD/files/base/scripts.conf"
 #       emulator (qemu)
 #       xorriso
 
-
-function is_excluded() {
-    old_ifs="$IFS"
-    IFS=" "
-    for i in "${excluded[@]}"; do
-        echo i: "$i"
-        if [ "$i" = "$1" ]; then 
-        #if [ "${excluded[$i]}" = "$1" ]; then
-            IFS="$old_ifs"
-            echo true
-            return
-        fi
-    done
-    IFS="$old_ifs"
-    echo false
-}
-
 function check_package() {     #   returns if package should be added to the list regardles operation mode
-    #   $1 = program name to search
-    if [ "$(is_excluded $2)" == true ]; then
-        echo EXCLUDED
-        return
-    fi
+    #   $1 = program name to search if fs
+    #   $2 = program name
     if [ "$mode" == install ]; then
         if [ "$(search_path "$1")" == NONE ]; then
             echo OK
@@ -45,6 +25,15 @@ function check_package() {     #   returns if package should be added to the lis
     fi
 }
 
+function add_package() {        #   adds package if not installed/removed (returns OK if package was added to the list or NONE)
+    #   $1 = program name to search in fs
+    #   $2 = program name
+    case "$(check_package "xorriso" xorriso)" in
+        OK) packages="$packages xorriso"; echo OK ;;
+        NONE) echo NONE ;;
+    esac
+}
+
 #   check for no parameters
 if [ "$#" -eq 0 ]; then
     error "please tell me what to do $(green "install or remove?")"
@@ -56,11 +45,14 @@ no_confirm="NO"
 if [ "$#" -ge 2 ]; then
     if [ "$2" == "-y" ]; then
         no_confirm="YES"
+    else
+        error "unknown parameter $(red "$2")"
+        exit 1
     fi
 fi
 
 
-
+pkg_list="rustup qemu xorriso"
 packages=()
 
 
@@ -74,8 +66,16 @@ case "$(echo $1 | tr '[:upper:]' '[:lower:]')" in
         mode=install
         mode_str=installed
     ;;
+    list)
+        echo "all packages: $(blue "$pkg_list")"
+
+
+
+        exit 0
+    ;;
     *) error "unknown option $arg"; exit 1 ;;
 esac
+
 
 #   install rust
 case $(check_package rustup rustup ) in
@@ -125,9 +125,6 @@ case $(check_package rustup rustup ) in
     NONE)
         note "$(blue rust) is already installed"
     ;;
-    EXCLUDED)
-        note "$(blue rust) is excluded"
-    ;;
 esac
 
 
@@ -153,6 +150,8 @@ case "$(uname)" in
             fi
         fi
 
+        #   MAYBE FIXME: add packages?
+
         pm_command="brew $mode ${packages[@]}"
         
     ;;
@@ -165,49 +164,65 @@ case "$(uname)" in
         case $(echo "$NAME" | awk '{print $1}') in
             "Fedora")
 
-                #   find compiler
+                #   check qemu
                 IFS=" "
                 for i in $arch; do
                     i="$(get_arch $i)"
-
-                    case "$(check_package "qemu-system-$i" qemu)" in
-                        OK)
-                            packages="$packages qemu"
-                        ;;
-                        NONE)
-                            note "$(blue qemu) is already installed"
-                        ;;
-                        EXCLUDED)
-                            note "$(blue qemu) is excluded"
-                        ;;
-                    esac
+                    #echo -n "$(add_package qemu-system-$i qemu)"
+                    if [ "$(add_package qemu-system-$i qemu)" = "NONE" ]; then
+                        note "$(blue qemu) is already $mode_str"
+                        break
+                    else
+                        
+                    fi
                 done
+                #packages="$(echo "$packages" | uniq)"
+                awk -v RS=' ' '!seen[$0]++' <<< "$packages"
 
-                #   check xorriso
-                case "$(check_package "xorriso" xorriso)" in
-                    OK)
-                        packages="$packages xorriso"
-                    ;;
-                    NONE)
-                        note "$(blue xorriso) is already installed"
-                    ;;
-                    EXCLUDED)
-                        note "$(blue xorriso) is excluded"
-                    ;;
-                esac
+                echo packages: $packages
+
+
+                if [ "$(add_package xorriso xorriso)" == "NONE" ];then
+                    note "$(blue xorriso) is already $mode_str"
+                fi
+
+                exit
+
+                #   find compiler
+                # IFS=" "
+                # for i in $arch; do
+                #     i="$(get_arch $i)"
+
+                #     case "$(check_package "qemu-system-$i" qemu)" in
+                #         OK)
+                #             packages="$packages qemu"
+                #             break
+                #         ;;
+                #         NONE)
+                #             note "$(blue qemu) is already $mode_str"
+                #         ;;
+                #     esac
+                # done
+
+                # #   check xorriso
+                # case "$(check_package "xorriso" xorriso)" in
+                #     OK)
+                #         packages="$packages xorriso"
+                #     ;;
+                #     NONE)
+                #         note "$(blue xorriso) is already installed"
+                #     ;;
+                # esac
 
                 #   cc is needed for some parts of the kernel
-                case $(check_package "cc" "cc") in
-                    OK)
-                        packages="$packages rust-cc-devel"
-                    ;;
-                    NONE)
-                        note "$(blue cc) (rust-cc-devel) is already installed"
-                    ;;
-                    EXCLUDED)
-                        note "$(blue cc) (rust-cc-devel) is excluded"
-                    ;;
-                esac
+                #case $(check_package "cc" "cc") in
+                #    OK)
+                #        packages="$packages rust-cc-devel"
+                #    ;;
+                #    NONE)
+                #        note "$(blue cc) (rust-cc-devel) is already installed"
+                #    ;;
+                #esac
 
                 pm_command="sudo dnf $mode ${packages[@]}"
                 if [ "$no_confirm" == "YES" ]; then

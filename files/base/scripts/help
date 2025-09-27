@@ -1,47 +1,52 @@
 #!/bin/bash
 
+#   TODO: revision
+
 source "$PWD/files/base/scripts.conf"
 
 if [ "$#" -eq 0 ]; then
-    echo "$(green ./util) is simple script used to build and manage your OS project
-    $(note "util is meant to be run only in project root directory")"
-echo
-echo "subcommands:
-    $(blue info)            - show information about project
-    $(blue conf)            - configures the environment and finds needed tools ($(red "needs internet connection"))
-    $(blue reconf) <arch>   - reconfigures the project (using different tools, ...)
-    $(blue build)           - builds the OS
-    $(blue run)             - runs the OS in emulator
-    $(blue dep)             - installs or removes the tools needed to build and run the operating system ($(red "needs internet connection"))
-    $(blue change)          - allows you to change project info
-    $(blue mkiso)           - creates bootable ISO for your OS
-    $(blue check)           - checks for errors"
-echo
-echo "$(magenta NOTE ): for more info use ./util help <subcommands>
-    for example: $(green "./util help build run") will show information about the $(blue build) and $(blue run) subcommand"
+    echo "$(green ./util) is simple script used to build and manage your OS project"
+    echo "      $(note "util is meant to be run only in project root directory")"
+    echo
+    echo "subcommands:"
+    echo "  $(blue conf) <arch> - configures the environment and finds needed tools"
+    echo "  $(blue reconf)      - reconfigures the project (using different tools, ...)"
+    echo "  $(blue build)       - builds the OS"
+    echo "  $(blue run)         - runs the OS in emulator"
+    echo "  $(blue dep)         - installs or removes the tools needed to build and run the operating system ($(red "needs internet connection"))"
+    echo "  $(blue change)      - allows you to change project info"
+    echo "  $(blue mkiso)       - creates bootable ISO for your OS"
+    echo "  $(blue check)       - checks for errors"
+    echo
+    echo "$(magenta NOTE ): for more info use $(green "./util") help <subcommands>"
+    echo "      for example: $(green "./util") $(blue "help build run") will show information about the $(blue build) and $(blue run) subcommand"
 
-echo
+    echo
 
-echo "$(magenta NOTE): you can run multiple subcommands with $(green util)
-    for example: $(green ./util) $(blue dep install) + $(blue "reconf") will install dependencies and reconfigure the project in one command"
+    echo "$(magenta NOTE): you can run multiple subcommands with $(green util)"
+    echo "      for example: $(green ./util) $(blue "dep install + reconf") will install dependencies and reconfigure the project in one command"
 
 else
-    CMD="$*"
+    CMD="$(echo "$*" | tr '[:upper:]' '[:lower:]')"
 fi
 
 IFS=' '
+
+if [ "$(echo $1 | tr '[:upper:]' '[:lower:]')" == "all" ]; then
+    CMD="conf reconf build run dep change mkiso check"
+fi
 
 
 for i in $CMD; do
     case $i in 
         conf)
             echo "$(green ./util) $(blue conf)"
-            echo "  $(yellow 'configures your project')"
-            echo "  configures CPU architecture and tools"
+            echo "  $(yellow 'configures the environment and finds needed tools')"
+            echo "  expects CPU architectures to be supported by the OS"
             echo
             echo "  supported CPU architectures: $(green x86_64), $(red arm64)"
             echo
-            echo "  usage: $(green ./util) $(blue "conf x86_64 rust")"
+            echo "  for example $(green ./util) $(blue "conf x86_64") will configure the project for the x86_64 architecture"
         ;;
         reconf)
             echo "$(green ./util) $(blue reconf)"
@@ -76,8 +81,6 @@ for i in $CMD; do
             echo "      $(red "you may miss some of the uninstalled tools")"
             echo "  append $(blue -y) to not ask for confirmation"
             echo
-            echo "  for example $(green ./util) $(blue "install exclude qemu") installs all needed packages except qemu"
-            echo
             echo "  supported platforms:"
             echo "      $(green Fedora Linux), $(red Arch Linux), $(red Ubuntu), $(red Debian) $(red CentOS)"
             echo "      $(green MacOS) (brew), $(red FreeBSD), $(red OpenBSD)"
@@ -87,12 +90,12 @@ for i in $CMD; do
             echo "  $(yellow 'allows you to change project info')"
             echo
             echo "  available changes:"
-            echo "      $(yellow os) $(blue "name/version/release") changes OS name, version or release"
-            echo "      $(yellow kernel) $(blue "name/version/release") changes kernel name, version or release"
+            echo "      $(yellow os) $(blue name)/$(blue version)/$(blue release) changes OS name, version or release"
+            echo "      $(yellow kernel) $(blue name)/$(blue version)/$(blue release) changes kernel name, version or release"
         ;;
         mkiso)
             echo "$(green ./util) $(blue mkiso)"
-            echo "  $(yellow 'builds you a bootable ISO') ($(red "the OS kernel must be built"))"
+            echo "  $(yellow 'builds you a bootable ISO for target platforms') ($(red "the OS kernel must be built"))"
             echo 
             echo "  usage: $(green ./util) $(blue "mkiso <arch/s>")"
         ;;
