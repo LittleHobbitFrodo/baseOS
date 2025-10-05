@@ -1,5 +1,5 @@
 #   This file is here to make rust-analyzer shut up :)
-#       Other files are actually entr
+#       (is not used by rust-script)
 
 [package]
 name = "util"
@@ -8,6 +8,9 @@ version = "0.1.0"
 edition = "2024"
 license="MIT"
 
+[profile.dev]
+panic="abort"
+
 
 
 [profile.release]
@@ -15,3 +18,15 @@ opt-level = 3
 
 [dependencies]
 colored = "3.0.0"
+serde = { version="1.0.228", features = ["derive"] }
+toml = "0.9.7"
+
+
+
+[[bin]]
+name="example"
+path="src/main.rs"
+
+[[bin]]
+name="conf"
+path="src/conf.rs"

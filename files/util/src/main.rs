@@ -1,43 +1,43 @@
-//! Dependencies can be specified in the script file itself as follows:
-//! - and should always be on top of the file
-//!
-//! ```cargo
-//! [dependencies]
-//! colored = "3.0.0"
-//! ```
-
-/* This is a template for your new commands. Simply copy it before editing
-    - all util commands are run by `rust-script` - a rust code interpretter
-    - all commands are in this directory and are named <cmd name>.rs
+/*  This is a template for your custom subcommand. Simply copy the `main.rs` file and edit it.
+    - util subcommands are simply rust executables
+    - subcommands are built by running `./util init` or `./util reinit`
+      - alternatively you can use the `./util --rebuild-tools` command
+    - the new command will carry the name of the file without its `.rs` extension
+      - add bin entry with the name and path to the file to the `Cargo.toml` file
+      ```toml
+      [[bin]]
+      name="<subcmd name>"
+      path="<path to file>"
+      ```
 */
-
 
 //  This module provides simple API for utility commands
 mod util;
 use util::*;
 
+use std::fs::File;
+use std::io::Read;
+
 fn main() {
 
-    //  always call this function on start of the script
-    initialize();
+    let mut file = File::open("example.toml").map_err(|e| ConfigError::FailedToOpenFile(e))
+        .expect("failed to open file");
 
-    //  use the `util::current_dir()` function instead of the `std::env::current_dir()`
-    //      `rust-script` modifies the path of the working directory
-    println!("pwd: {}", current_dir().to_string_lossy());
+    //  read the file
+    let mut content = String::with_capacity(64);
+    file.read_to_string(&mut content).map_err(|_| ConfigError::FailedToReadFile)
+        .expect("failed to read file");
 
-    //  report error
-    errorln!("some error occured!");
+    let table: toml::Table = match toml::from_str(content.as_str()) {
+        Ok(tab) => tab,
+        Err(e) => panic!("failed: {e:?}"),
+    };
 
-    if let Ok(args) = try_args() {
-        print!("arguments:\t");
-        for arg in args.iter() {
-            print!(" {arg}");
-        }
-    } else {
-        //  reports error and exits the script
-        fail!(internal, "failed to get program arguments");
-            //  user errors triggers the help menu
+    for (name, val) in table {
+        println!("{name}:\t{val:?}");
     }
 
 }
 
+//  TODO?: move all configs into one
+//  TODO: add scripts built attribute into the util config

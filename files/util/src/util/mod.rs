@@ -1,7 +1,7 @@
 
 pub mod exit_code {
     pub const OK: i32 = 0;
-    /// invalid parameters, ...
+    /// User error - triggers help
     pub const USER_ERROR: i32 = 1;
     /// Internal failure
     pub const INTERNAL_ERROR: i32 = 2;
@@ -10,13 +10,13 @@ pub mod exit_code {
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use std::{ffi::os_str::Display, io::{stdin, stdout, Read, Write}};
+use std::{io::{stdin, stdout, Read, Write}};
 
 pub use colored::*;
 
 mod config;
-pub use config::{PATH, KernelConfig};
-
+pub use config::*;
+use serde::{Deserialize, Serialize};
 
 /// Reports error
 #[macro_export]
@@ -82,33 +82,44 @@ macro_rules! noteln {
 /// Prints error message and exits the program
 /// 
 /// usage:
-/// - internal error: `fail!(internal, "formatted {}", "message")`
-/// - user error: `fail!(userm "formatted {}", "message")`
+/// - internal error: `fail!(internal: "formatted {}", "message")`
+/// - user error: `fail!(user: "formatted {}", "message")`
 ///   - user error triggers the help menu
 #[macro_export]
 macro_rules! fail {
-    (internal, $($arg:tt)*) => {{
+    (internal: $($arg:tt)*) => {{
         $crate::error!($($arg)*);
         std::process::exit($crate::exit_code::INTERNAL_ERROR);
     }};
-    (user, $($arg:tt)*) => {{
+    (user: $($arg:tt)*) => {{
         $crate::error!($($arg)*);
+        std::process::exit($crate::exit_code::USER_ERROR);
+    }};
+    (internal) => {{
+        std::process::exit($crate::exit_code::INTERNAL_ERROR);
+    }};
+    (user) => {{
         std::process::exit($crate::exit_code::USER_ERROR);
     }};
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[repr(u32)]
 pub enum Arch {
+    None,
     X86_64,
-    Arm64,
+    Arm64
 }
 
-impl Arch {
+impl Default for Arch {
+    fn default() -> Self { Self::None }
+}
 
-    /// Converts string to the `Arch` enum
-    /// - case sensitive
-    pub fn from_str(from: &'_ str) -> Result<Self, ()> {
-        Ok(match from {
+
+impl FromStr for Arch {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_ascii_lowercase().as_str() {
             "x86_64" => Self::X86_64,
             "amd64" => Self::X86_64,
             "x64" => Self::X86_64,
@@ -118,20 +129,40 @@ impl Arch {
             _ => { return Err(()) }
         })
     }
+}
+
+
+impl Arch {
+
+    /// indicates whether an architecture is supported
+    /// - case sensitive
+    pub fn is_supported(arch: &'_ str) -> bool {
+        match Self::from_str(arch) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
+
+    /// Returns list of all supported architectures (as strings)
+    pub const fn all_supported() -> &'static [&'static str] {
+        &["X86_64", "Arm64"]
+    }
 
     /// Converts the `Arch` enum into `str`
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::Arm64 => "arm64",
-            Self::X86_64 => "x86_64",
+            Self::Arm64 => "Arm64",
+            Self::X86_64 => "X86_64",
+            Self::None => "None"
         }
     }
 
     /// Converts the `Arch` enum to `String`
     pub fn to_string(&self) -> String {
         match self {
-            Self::Arm64 => String::from("arm64"),
-            Self::X86_64 => String::from("x86_64"),
+            Self::Arm64 => String::from("Arm64"),
+            Self::X86_64 => String::from("X86_64"),
+            Self::None => String::from("None")
         }
     }
 
@@ -162,7 +193,8 @@ pub fn search_path(command: &str) -> Result<String, ()> {
             if let Ok(f) = file {
                 let name = f.file_name();
                 if name == command {
-                    return Ok(name.into_string().map_err(|_| ())?)
+                    //return Ok(name.into_string().map_err(|_| ())?)
+                    return Ok(f.path().to_str().unwrap().to_string());
                 }
             }
         }
@@ -194,72 +226,6 @@ pub fn ask(question: &str) -> Result<bool, Option<String>> {
     }
 }
 
-static PWD: RwLock<String> = RwLock::new(String::new());
-static ARGS: RwLock<Vec<String>> = RwLock::new(Vec::new());
-
-/// Returns the current working directory
-/// - do not use the `std::env::current_dir()`
-pub fn current_dir() -> PathBuf {
-    let pwd = PWD.read().expect("failed to acquire lock");
-    PathBuf::from_str(&*pwd).expect("failed to parse path")
-}
-
-/// Tries to get the current working directory
-/// - returns `Err` upon error
-pub fn try_current_dir() -> Result<PathBuf, ()> {
-    let pwd = PWD.read().map_err(|_| ())?;
-    Ok(PathBuf::from_str(&*pwd).map_err(|_| ())?)
-}
-
-/// Returns the current working directory as `String`
-/// - lower overhead than `current_dir().to_string_lossy()`
 pub fn current_dir_as_string() -> String {
-    PWD.read().expect("failed to acquire lock").clone()
-}
-
-/// Tries to get the current working directory
-pub fn try_current_dir_as_string() -> Result<String, ()> {
-    Ok(PWD.read().map_err(|_| ())?.clone())
-}
-
-/// Returns reference to the collected program arguments
-pub fn args<'l>() -> RwLockReadGuard<'l, Vec<String>> {
-    ARGS.read().expect("failed to acquire lock")
-}
-
-/// Tries to get reference to the collected program arguments
-pub fn try_args<'l>() -> Result<RwLockReadGuard<'l, Vec<String>>, ()> {
-    ARGS.read().map_err(|_| ())
-}
-
-/// Tries to get mutable reference to the collected program arguments
-pub fn try_args_mut<'l>() -> Result<RwLockWriteGuard<'l, Vec<String>>, ()> {
-    ARGS.write().map_err(|_| ())
-}
-
-/// Returns mutable reference to the collected program arguments
-pub fn args_mut<'l>() -> RwLockWriteGuard<'l, Vec<String>> {
-    ARGS.write().expect("failed to acquire lock")
-}
-
-
-/// Initializes the util module
-pub fn initialize() {
-    let mut args: Vec<String> = std::env::args().collect();
-
-    let mut index = args.iter().position(|arg| *arg == "--DIR")
-        .expect("no DIR specified");
-
-    index += 1;
-
-    if index == args.len() {
-        panic!("no path for DIR");
-    }
-
-    *PWD.write().expect("failed to acquire lock") = args.remove(index);
-    args.remove(index - 1);
-
-    *ARGS.write().expect("failed to acquire lock") = args;
-
-
+    std::env::current_dir().expect("failed to get current directory").to_string_lossy().to_string()
 }

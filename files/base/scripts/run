@@ -5,6 +5,8 @@ source "$PWD/files/base/scripts.conf"
 debug=false
 system=""
 
+parameters_file="$CONFIG_PATH/qemu-parameters.toml"
+
 
 
 if [ "$#" != 0 ]; then
@@ -24,7 +26,7 @@ if [ "$#" != 0 ]; then
     done
 fi
 
-if [ -e "$CONFIG_PATH/qemu-parameters.conf" ]; then
+if [ -e "$parameters_file" ]; then
 
     if [ -n "$system" ]; then
         arch="$system"
@@ -41,7 +43,7 @@ if [ -e "$CONFIG_PATH/qemu-parameters.conf" ]; then
         
         current_arch="$i"
         source "$(arch_config $i)"
-        source "$CONFIG_PATH/qemu-parameters.conf"
+        source "$parameters_file"
 
         $emulator $qemu_parameters
 
@@ -49,7 +51,7 @@ if [ -e "$CONFIG_PATH/qemu-parameters.conf" ]; then
 
 else
     error "Qemu parameters are missing"
-    note "please create the $(green "$CONFIG_PATH/qemu-parameters.conf") file"
+    note "please create the $(green "$parameters_file") file"
     exit 1
 fi
 

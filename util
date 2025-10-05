@@ -1,51 +1,15 @@
 #!/bin/bash
 
-function report() {
-    status="$?"
-    if [ -n "${subcmd+x}" ]; then
-        echo "$(red "OPERATION $subcmd FAILED")"
-        if [[ -e "$SCRIPTS/$subcmd" && "$status" == 1 ]]; then
-            $SCRIPTS/help $subcmd
-        fi
-    else
-        echo "$(red "COMMAND $BASH_COMMAND FAILED")"
-    fi
-    exit 1
-}
+source "$PWD/files/util/header.sh"
 
-set -eEuo pipefail
-
-#   set function to call if anything fails
-trap report ERR
-
-
-source "$PWD/files/base/scripts.conf"
-
-
-#   SCRIPT ENTRY POINT
 if [ "$#" -lt 1 ]; then
-    error "no command given"
-    echo
-    $SCRIPTS/help
+    #   arg count <= 1
+    echo "$(red ERROR): no subcommand specified"
+    exec "$PWD/files/util/help.sh"
     exit 1
 fi
 
-if [ "$1" != conf ]; then
-    if [ ! -e "$UTIL_CONFIG" ]; then
-        error "project is not configured"
-        echo
-        $SCRIPTS/help conf
-        exit 1
-    else
-        source $UTIL_CONFIG
-        if [ "$configured" != true ]; then
-            error "project is not configured"
-            echo
-            $SCRIPTS/help conf
-            exit 1
-        fi
-    fi
-fi
+#set -eEuo pipefail
 
 args="${@:1}"
 subcmd=$1
@@ -62,38 +26,47 @@ for i in $args; do
 
     if [ "$(echo "$i" | wc -w)" -gt 1 ]; then
         #   has parameters
-
         cmd_args="${i#* }"
-
-        if [ -e "$SCRIPTS/$subcmd" ]; then
-            $SCRIPTS/$subcmd $cmd_args
-        else
-            error "subcommand '$subcmd' does not exist"
-            $SCRIPTS/help
-            exit 1
-        fi
-
-        if [ "$subcmd" == build ]; then
-            $SCRIPTS/mkiso
-        fi
-
     else
         #   no parameters
-        if [ -e "$SCRIPTS/$subcmd" ]; then
-            $SCRIPTS/$subcmd
-        else
-            error "subcommand '$subcmd' does not exist"
-            $SCRIPTS/help
-            exit 1
-        fi
-
-        
-        if [ "$subcmd" == build ]; then
-            $SCRIPTS/mkiso
-        fi
+        cmd_args=""
     fi
+
+    case "$subcmd" in
+        "--rebuild-util"|setup)
+            if [ "$subcmd" = setup ]; then
+                install_rustup notify
+            else
+                install_rustup
+            fi
+            build_scripts -vocal
+        ;;
+        help)
+            exec "$PWD/files/util/help.sh" $cmd_args
+        ;;
+        *)
+            #   other subcommands
+            if [ -e "$PWD/files/util/commands/$subcmd" ]; then
+                $PWD/files/util/commands/$subcmd $cmd_args
+
+                case "$?" in
+                    2)
+                        #   internal error
+                        error "subcommand $(blue "$subcmd") failed due to internal error"
+                    ;;
+                    1)
+                        #   user error
+                        exec "$PWD/files/util/help.sh" $subcmd
+                    ;;
+                esac
+
+            else
+                error "unknown subcommand \"$subcmd\""
+                exec "$PWD/files/util/help.sh"
+                exit $user_error
+            fi
+        ;;
+    esac
 
     IFS="+"
 done
-
-exit
