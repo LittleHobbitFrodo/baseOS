@@ -46,7 +46,7 @@ for i in $args; do
         ;;
         *)
             #   other subcommands
-            if [ -e "$PWD/files/util/commands/$subcmd" ]; then
+            if [ -e "$PWD/files/util/commands/$subcmd" ] && [ -f "$PWD/files/util/commands/$subcmd" ]; then
                 $PWD/files/util/commands/$subcmd $cmd_args
 
                 case "$?" in
@@ -59,7 +59,6 @@ for i in $args; do
                         exec "$PWD/files/util/help.sh" $subcmd
                     ;;
                 esac
-
             else
                 error "unknown subcommand \"$subcmd\""
                 exec "$PWD/files/util/help.sh"

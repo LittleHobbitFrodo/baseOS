@@ -1,0 +1,2 @@
+compiler = "/home/sam/.cargo/bin/cargo"
+emulator = "/usr/bin/qemu-system-x86_64"

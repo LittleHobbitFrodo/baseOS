@@ -1,7 +1,4 @@
 configured = true
 xorriso = "/usr/bin/xorriso"
 iso_name = "BaseOS"
-arch = [
-    "X86_64",
-    "Arm64",
-]
+arch = ["X86_64"]

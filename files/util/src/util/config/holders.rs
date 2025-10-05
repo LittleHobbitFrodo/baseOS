@@ -425,6 +425,15 @@ pub struct ArchConfig {
 
 impl ArchConfig {
 
+    /// Returns target architecture 
+    pub const fn arch(&self) -> Arch {
+        self.arch
+    }
+
+    pub const fn from_parts(arch: Arch, compiler: String, emulator: String) -> Self {
+        Self { arch, compiler, emulator }
+    }
+
     /// Creates new empty configuration
     pub const fn empty(arch: Arch) -> Self {
         Self {

@@ -30,7 +30,7 @@ pub(super) const LIMINE_CMDLINE: &'static str = "bootloader/limine-cmdline";
 #[inline]
 /// Path to the arch configuration (`config/util-<arch>.toml`)
 pub(super) fn arch_config_path(arch: Arch) -> PathBuf {
-    PathBuf::from(format!("config/util-{arch}.toml"))
+    PathBuf::from(format!("config/{}.toml", arch.normalize()))
 }
 
 /// Used to describe which config file do you want to access

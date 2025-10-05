@@ -4,6 +4,8 @@ source "$PWD/files/util/header.sh"
 
 #   This file is the help menu
 
+echo 
+
 if [ "$#" -eq 0 ]; then
     #   arg count == 0 -> show quick help
     echo "$(green ./util) is extensible suite of convenience tools to help you manage your OS project comfortably"
@@ -29,8 +31,12 @@ else
     args="${@:1}"
     for subcmd in $args; do
         case "$subcmd" in
+
+            conf)
+                echo helloo
+            ;;
             *)
-                error "unknown subcommand \"$subcmd\""
+                error "$(blue help) unknown subcommand \"$subcmd\""
             ;;
         esac
     done

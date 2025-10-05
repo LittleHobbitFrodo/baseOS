@@ -7,10 +7,9 @@ pub mod exit_code {
     pub const INTERNAL_ERROR: i32 = 2;
 }
 
-use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{io::{stdin, stdout, Read, Write}};
+use std::process::{Child, Command, ExitCode};
 
 pub use colored::*;
 
@@ -75,7 +74,7 @@ macro_rules! noteln {
     ($($arg:tt)*) => {{
         use $crate::Colorize;
         print!("{}: ", "note".blue());
-        print!($($arg)*);
+        println!($($arg)*);
     }};
 }
 
@@ -133,6 +132,15 @@ impl FromStr for Arch {
 
 
 impl Arch {
+
+    /// returns normalized name for target architecture
+    pub fn normalize(&self) -> &'static str {
+        match self {
+            Self::Arm64 => "aarch64",
+            Self::None => "none",
+            Self::X86_64 => "x86_64",
+        }
+    }
 
     /// indicates whether an architecture is supported
     /// - case sensitive
@@ -228,4 +236,36 @@ pub fn ask(question: &str) -> Result<bool, Option<String>> {
 
 pub fn current_dir_as_string() -> String {
     std::env::current_dir().expect("failed to get current directory").to_string_lossy().to_string()
+}
+
+pub fn cmd(cmd: &'_ str, args: Option<&'_ [&'_ str]>) -> Result<ExitCode, std::io::Error> {
+
+    let mut cmd = match args {
+        Some(args) => Command::new(cmd).args(args).spawn()?,
+        None => Command::new(cmd).spawn()?,
+    };
+
+
+    cmd.wait().map(|stat| ExitCode::from(stat.code().expect("failed to get exit code") as u8))
+}
+
+pub fn cmd_async(cmd: &'_ str, args: Option<&'_ [&'_ str]>) -> Result<Child, std::io::Error> {
+
+    Ok(match args {
+        Some(args) => Command::new(cmd).args(args).spawn()?,
+        None => Command::new(cmd).spawn()?,
+    })
+
+}
+
+
+
+#[macro_export]
+macro_rules! cmd {
+    ($cmd:expr) => {
+        cmd($cmd, None)
+    };
+    ($cmd:expr, $($arg:expr),* $(,)?) => {{
+        cmd($cmd, Some(&[$($arg),*]))
+    }};
 }
