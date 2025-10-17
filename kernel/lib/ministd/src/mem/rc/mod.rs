@@ -2,7 +2,8 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
-//  This file prvides the reference counter `Rc`
+//! The classic reference counted pointer `Rc`
+//! - This implementation does not offer the `Weak` pointer yet
 
 use core::alloc::GlobalAlloc;
 use core::borrow::{Borrow, BorrowMut};
@@ -19,6 +20,7 @@ pub(crate) use rc_inner::*;
 use crate::{alloc::*, TryClone, Cow, ToOwned};
 
 /// A single-threaded reference-counting pointer
+/// - With no `Weak` pointer unfortunately
 pub struct Rc<T: Sized> {
     data: NonNull<RcInner<T>>,
     _not_sync_not_send: PhantomData<Cell<()>>,    //  for !Send

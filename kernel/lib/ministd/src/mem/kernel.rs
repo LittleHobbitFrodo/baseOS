@@ -2,13 +2,11 @@
 //	this file originally belonged to the baseOS project
 //		an OS template on which to build
 
+//! Marks position and size of each section of the kernel
+
 use super::Region;
 use crate::RwLock;
 
-
-/// Describes the memory layout of the linker script
-/// - each member represents a section in the linker script
-/// - physical addresses are unknown by default
 pub struct Layout {
     pub kernel: Region,
     pub rodata: Region,
@@ -64,6 +62,8 @@ impl Layout {
 /// Stores kernel memory layout metadata
 /// - position and size of all linker sections
 /// - physical addresses are unknown by default
+/// 
+/// **NOTE**: do not forget to call the `ministd::init::memory()` to fully initialize the data
 pub static LAYOUT: RwLock<Layout> = RwLock::new(Layout::new());
 
 

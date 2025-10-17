@@ -4,24 +4,23 @@
 
 
 
-//  this module provides basic IO functionalities
-//      such as [`in`] and [`out`] instructions and better text rendering
+//! this module provides basic IO functionalities
+//! - such as [`in`] and [`out`] instructions and better text rendering
+//!   - functions to enable/disable interrupts are provided too
 
 #[cfg(feature="renderer")]
 #[macro_use]
-pub mod text;
+mod text;
+pub use text::*;
 
-#[cfg(not(test))]
-mod functions;
-
-#[cfg(not(test))]
-pub use functions::*;
+mod hardware;
+pub use hardware::*;
 
 
 //  functions below are made to not work intentionally
 //  - if testing is done on other architectures than the kernel is designed for, it fails
 
-#[cfg(test)]
+/*#[cfg(test)]
 pub use tst::*;
 
 #[cfg(test)]
@@ -54,4 +53,4 @@ mod tst {
     pub fn inq(port: u16) -> u64 { 0 }
 
     pub fn wait() {}
-}
+}*/

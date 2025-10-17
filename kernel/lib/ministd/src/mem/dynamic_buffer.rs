@@ -2,14 +2,16 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
+
+//! The `DynamicBuffer` is similar to the `Vec` collection, it does allocate, shrink and expand allocated data, but does not work with its contents
+
+
+
 use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ptr::{copy_nonoverlapping, null_mut, NonNull};
 use core::alloc::{Layout, GlobalAlloc};
 use crate::{ALLOCATOR, TryClone};
-
-
-
 
 /// returns the minimum of 3 values
 #[inline(always)]
@@ -19,17 +21,27 @@ fn min_3(v1: usize, v2: usize, v3: usize) -> usize {
 
 
 
-/// Dynamic buffer has only ne task: memory management
+/// The `DynamicBuffer` has only ne task: memory management
 /// - it is not much useful on its own...
 /// 
 /// It simply allocates memory like vector would, but does not work with its content
 /// - this also means that no elements will be dropped
 /// 
+/// ## Memory layout
+/// The `DynamicBuffer` has standardized memory layout:
+/// ```rust
+/// pub struct DynamicBuffer<T, STEP, ALIGN> {
+///     data: NonNull::<u8>,
+///     cap: u32,
+///     pub size: u32,
+/// }
+/// ```
+/// 
 /// ## Implementation details
 /// - uses `self.capacity() > 0` to check if any data is allocated
 ///   - `self.data` is set to `NonNull::dangling()` if not
-/// - `self.size` is only used for copying of elements and is not modified
-/// - `drop()` will only deallocate buffer, no elements are dropped
+/// - `self.size` tells the DynamicBuffer how many elements to copy and is not modified by the `DynamicBuffer` directly
+/// - `drop()` will only deallocate the buffer, no elements are dropped
 /// 
 /// ### Generic parameters
 /// 1. `T`: defines the type that is allocated

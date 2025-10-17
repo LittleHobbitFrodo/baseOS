@@ -2,7 +2,8 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
-// this file simplyfies array declaration and management
+
+//! The `Box` for arrays and slices - the `ministd::Box` cannot yet allocate arrays and slices
 
 use core::alloc::Layout;
 use core::mem::{ManuallyDrop, MaybeUninit};

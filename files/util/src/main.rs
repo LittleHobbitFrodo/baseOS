@@ -20,24 +20,13 @@ use std::io::Read;
 
 fn main() {
 
-    let mut file = File::open("example.toml").map_err(|e| ConfigError::FailedToOpenFile(e))
-        .expect("failed to open file");
-
-    //  read the file
-    let mut content = String::with_capacity(64);
-    file.read_to_string(&mut content).map_err(|_| ConfigError::FailedToReadFile)
-        .expect("failed to read file");
-
-    let table: toml::Table = match toml::from_str(content.as_str()) {
-        Ok(tab) => tab,
-        Err(e) => panic!("failed: {e:?}"),
-    };
-
-    for (name, val) in table {
-        println!("{name}:\t{val:?}");
-    }
+    println!("hello world!");
+    println!("limine:");
+    println!("\tcmdline:    {}", PATH.limine.cmdline_string());
+    println!("\tconf dir:   {}", PATH.limine.config_dir_string());
+    println!("\tconfig:     {}", PATH.limine.config_string());
+    println!("\tdebug conf: {}", PATH.limine.config_debug_string());
+    println!("\tdata dir:   {}", PATH.limine.data_dir_string());
+    println!("\tbootloader: {}", PATH.limine.bootloader_for_string(Arch::X86_64).expect("failure"));
 
 }
-
-//  TODO?: move all configs into one
-//  TODO: add scripts built attribute into the util config

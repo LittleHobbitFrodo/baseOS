@@ -1,6 +1,6 @@
 use toml::map::Map;
 use std::{fmt::{write, Debug}, fs::File, io::{empty, Read, Write}, path::PathBuf, str::FromStr, sync::Arc};
-use crate::util::{arch_config_path, KERNEL_CONFIG, OS_CONFIG, PATH, UTIL_CONFIG};
+use crate::util::{arch_config_path, KERNEL_CONFIG, KERNEL_CONFIG_FILE, OS_CONFIG, OS_CONFIG_FILE, PATH, UTIL_CONFIG, UTIL_CONFILG_FILE};
 
 use super::{Arch, ConfigError};
 use serde::{de::Error, ser, Deserialize, Serialize};
@@ -167,7 +167,7 @@ impl ConfigHolder<'_> for UtilConfig {
     
     #[inline]
     fn default_path() -> PathBuf {
-        unsafe { PathBuf::from_str(UTIL_CONFIG).unwrap_unchecked() }
+        unsafe { PathBuf::from_str(UTIL_CONFILG_FILE).unwrap_unchecked() }
     }
 
     #[inline(always)]
@@ -176,6 +176,18 @@ impl ConfigHolder<'_> for UtilConfig {
     }
 
     fn empty() -> Self {
+        Self {
+            configured: false,
+            xorriso: String::new(),
+            iso_name: String::new(),
+            arch: Vec::new(),
+        }
+    }
+}
+
+impl UtilConfig {
+    /// Constructs new empty instance
+    pub const fn new() -> Self {
         Self {
             configured: false,
             xorriso: String::new(),
@@ -226,10 +238,6 @@ impl ConfigHolder<'_> for ConfigTriplet {
 
 }
 
-trait Triplet where Self: Sized {
-    
-}
-
 /// Used to store the kernel config (`config/kernel.toml`) in memory
 /// - this structure can be (de)serialized by using `Self::serialize()` or `Self::deserialize`
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -245,7 +253,7 @@ pub struct KernelConfig {
 impl<'l> ConfigHolder<'l> for KernelConfig {
 
     #[inline]
-    fn default_path() -> PathBuf { unsafe { PathBuf::from_str(KERNEL_CONFIG).unwrap_unchecked() } }
+    fn default_path() -> PathBuf { unsafe { PathBuf::from_str(KERNEL_CONFIG_FILE).unwrap_unchecked() } }
 
     #[inline]
     fn default_path_for(&self) -> PathBuf { Self::default_path() }
@@ -283,6 +291,15 @@ impl<'l> ConfigHolder<'l> for KernelConfig {
 }
 
 impl KernelConfig {
+
+    pub const fn new() -> Self {
+        Self {
+            name: String::new(),
+            version: Version::empty(),
+            release: String::new(),
+        }
+    }
+
     fn from_triplet(value: ConfigTriplet) -> Result<Self, ()> {
         Ok(Self {
             name: value.name,
@@ -338,7 +355,7 @@ pub struct OsConfig {
 impl<'l> ConfigHolder<'l> for OsConfig {
 
     #[inline]
-    fn default_path() -> PathBuf { unsafe { PathBuf::from_str(OS_CONFIG).unwrap_unchecked() } }
+    fn default_path() -> PathBuf { unsafe { PathBuf::from_str(OS_CONFIG_FILE).unwrap_unchecked() } }
 
     #[inline]
     fn default_path_for(&self) -> PathBuf { Self::default_path() }
@@ -377,6 +394,16 @@ impl<'l> ConfigHolder<'l> for OsConfig {
 }
 
 impl OsConfig {
+
+
+    pub const fn new() -> Self {
+        Self {
+            name: String::new(),
+            version: Version::empty(),
+            release: String::new(),
+        }
+    }
+
     fn from_triplet(value: ConfigTriplet) -> Result<Self, ()> {
         Ok(Self {
             name: value.name,
@@ -419,8 +446,8 @@ impl OsConfig {
 pub struct ArchConfig {
     #[serde(skip)]
     arch: Arch,
-    compiler: String,
-    emulator: String,
+    pub compiler: String,
+    pub emulator: String,
 }
 
 impl ArchConfig {
@@ -451,8 +478,6 @@ impl ArchConfig {
         }
 
         let path = arch_config_path(arch);
-
-        println!("path: {}", path.to_string_lossy());
 
         let mut this: Self = read_toml(path)?;
         this.arch = arch;

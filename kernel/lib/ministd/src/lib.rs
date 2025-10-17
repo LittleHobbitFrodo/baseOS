@@ -2,16 +2,13 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
+//! # The `ministd` crate
+//! The ministd crate is the core of the `BaseOS` project. It is intended to do some of the work of the rust standard library and give you (the OS developer) some useful functionalities to kickstart your OS development
+
 #![no_std]
 #![no_main]
-//#![cfg_attr(feature = "nightly", feature(allocator_api))]
 
 use core::ops::Deref;
-/// # MINISTD crate
-/// This crate mimics basic functionalities of the STD crate  
-/// Each functionality that provides [`init()`] function is meant to be initialized manually in your kernel [`init()`] function
-/// 
-/// PS: bootloader requests are done in the [`bootloader`] local crate
 
 
 pub use core::pin::Pin;
@@ -179,4 +176,5 @@ macro_rules! panic_fmt {
         panic!();
     }
 }
+
 

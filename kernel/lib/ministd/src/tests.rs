@@ -2,6 +2,11 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
+//! Makes unit testing possible, but in a different way than the `std` does it
+//! 
+//! **TODO**: **REDO** (yes, **complete redo**) the testing mechanisms, its bit (well, bit more than a bit) scatchy and does not work well
+
+
 use crate::RENDERER;
 use crate::renderer::MinistdRenderer;
 use crate::{eprint, println};
@@ -15,7 +20,7 @@ type TestFn = unsafe extern "Rust" fn() -> Result<(), Option<&'static str>>;
 type TestReurnType = Result<(), Option<&'static str>>;
 
 /// This structure is internally used for unit testing
-/// do not use it on your own
+/// - It may not be a good idea to use it on your own...
 /// 
 /// **name**: name of the test
 /// - if tests are run manually at some point, pass this name to run this test

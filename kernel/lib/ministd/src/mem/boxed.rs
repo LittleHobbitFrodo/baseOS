@@ -2,7 +2,11 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
-// the (almost) standard implementation of `Box<T>` structure
+//! The (almost) standard implementation of `Box<T>` structure
+//! - This `Box` cannot yet allocate arrays/slices
+//!   - Use the `Array` structure to do so
+//! 
+//! **TODO**: Try to implement array/slice allocation directly in box
 
 use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::Display;

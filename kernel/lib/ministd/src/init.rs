@@ -3,7 +3,7 @@
 //      on OS template on which to build
 
 
-//  declares ministd initialization functions
+//! Provides all the initialization functions needed to make the `ministd` work
 
 #[cfg(all(feature="allocator", feature="spin"))]
 use crate::mem::alloc;

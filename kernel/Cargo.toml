@@ -12,7 +12,7 @@ authors = [
 
 
 [[bin]]
-name="baseOS"
+name="BaseOS-kernel"
 path="src/prelude.rs"
 
 

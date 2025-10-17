@@ -2,6 +2,7 @@
 //  this file originally belonged to baseOS project
 //      on OS template on which to build
 
+//! Even though `ministd::Vec` is not an exact copy of `std::Vec`, you will like it: it allows you to tweak how data is stored in memory!
 
 use core::alloc::Layout;
 use core::borrow::{Borrow, BorrowMut};
@@ -28,9 +29,9 @@ use crate::panic_fmt;
 
 
 /// A contiguous growable array type, written as `Vec<T>`, short for ‘vector’
-/// - this implementation will also allow you to **tweak memory management using generic** parameters
-/// - this vector is not an exact representation of the `std::Vec`, all important functions are preserved, some functions are added
-///   - yo access the `chunks`, `windows`, etc. functions, use the `as_slice` function as follows: `self.as_slice().chunks()`
+/// - This implementation will also allow you to **tweak memory management** using generic parameters
+/// - This vector is not an exact representation of the `std::Vec`, all important functions are preserved, some functions are added
+///   - To access the `chunks`, `windows` and other functions, use the `as_slice` function as follows: `self.as_slice().chunks()`
 /// 
 /// ### Generic parameters
 /// 1. `T`: datatype of each element

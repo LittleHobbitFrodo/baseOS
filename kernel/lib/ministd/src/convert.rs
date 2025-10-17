@@ -2,8 +2,9 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
+//! Makes sure all your unsigned integers can be easily aligned
 
-
+/// Makes sure all your unsigned integers can be easily aligned
 pub trait Align {
     /// returns `Self` aligned to `align`
     fn align(&self, align: usize) -> Self;
@@ -12,11 +13,13 @@ pub trait Align {
     fn align_mut(&mut self, align: usize);
 }
 
+/*/// Checks if some number is aligned as intended
 pub trait IsAligned {
+    /// Checks if `Self` is aligned as intended
     fn is_aligned(&self, align: usize) -> bool;
 
     fn is_not_aligned(&self, align: usize) -> bool;
-}
+}*/
 
 macro_rules! impl_align_for {
     ($i:ty) => {
@@ -33,7 +36,7 @@ macro_rules! impl_align_for {
             }
         }
 
-        impl IsAligned for $i {
+        /*impl IsAligned for $i {
             #[inline]
             fn is_aligned(&self, align: usize) -> bool {
                 *self == *self & !(align as Self-1)
@@ -43,7 +46,7 @@ macro_rules! impl_align_for {
             fn is_not_aligned(&self, align: usize) -> bool {
                 *self != *self * !(align as Self-1)
             }
-        }
+        }*/
     };
 }
 

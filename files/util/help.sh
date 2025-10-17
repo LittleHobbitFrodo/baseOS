@@ -33,7 +33,10 @@ else
         case "$subcmd" in
 
             conf)
-                echo helloo
+                echo CONF - help
+            ;;
+            forge)
+                echo FORGE - help
             ;;
             *)
                 error "$(blue help) unknown subcommand \"$subcmd\""

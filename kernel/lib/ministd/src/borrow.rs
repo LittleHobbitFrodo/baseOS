@@ -2,13 +2,17 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
+
+//! Reimplements the usual `cow` bussiness from the `std` library
+//! 
+//! (moo)
+
 pub use Cow::{Borrowed, Owned};
 pub use core::borrow::{Borrow, BorrowMut};
 
 use core::{ops::*, fmt, hash::{Hash, Hasher}, cmp::{Ord, Ordering}};
 
 use crate::{String, Vec};
-
 
 
 pub enum Cow<'a, T: ?Sized + 'a>

@@ -2,33 +2,50 @@
 //	this file originally belonged to the baseOS project
 //		an OS template on which to build
 
-/// this file provides basic memory-related functionalities
+
+//! Provides memory related functionalities
+//! 
+//! such as:
+//! 1. Commonly used sizes for memory - `KB` for kilobyte, `MB` for megabyte
+//!     - uses the `1024` convention
+//! 2. Page sizes and counts for each supported architecture (`PAGE_SIZE`)
+//! 3. Rust std-like structures, collections and smart pointers
+//!     1. `Box<T>` - Allocates memory on the heap
+//!         - Does not support slice and array allocation yet (use `Array<T>` for that)
+//!     2. `String` - Special way to store text
+//!         - Uses generics to give you control over overallocation
+//!     3. `Vec<T>` - Modified version of the `std::Vec` giving control over overallocation and data align
+//!     4. `Rc` - Classic reference counter
+//!         - The `Weak` pointer is not yet implemented
+//! 4. `Region` struct - used by the allocator to mark used memory areas
 
 
-
+/// Standard size of one **kilobyte** (1024 bytes)
 pub const KB: usize = 1024;
+/// Standard size of one **megabyte** (1024 kilobytes)
 pub const MB: usize = 1024 * 1024;
+/// Standatd size of one **gigabyte** (1024 megabytes)
 pub const GB: usize = 1024 * 1024 * 1024;
+/// Standard size of one **terabyte** (1024 gigabytes)
+pub const TB: usize = 1024 * 1024 * 1024 * 1024;
 
 #[cfg(target_arch = "x86_64")]
-/// Constant that shows the size of one page
-/// - target specific
+/// Constant that shows the size of one page (target specific)
+/// - in bytes
 pub const PAGE_SIZE: usize = 4096;
 
 #[cfg(target_arch = "x86_64")]
-/// Constant that shows the align of one page
-/// - target specific
+/// Constant that shows the align of one page (target specific)
+/// - in bytes
 pub const PAGE_ALIGN: usize = 4096;
 
 #[cfg(not(target_arch = "x86_64"))]
-pub const PAGE_SIZE: usize = 4096;
+compile_error!("this target is unsupported by the ministd");
 
-#[cfg(not(target_arch = "x86_64"))]
-pub const PAGE_ALIGN: usize = 4096;
 
 pub use core::mem::needs_drop;
 
-pub mod readonly;
+mod readonly;
 pub use readonly::ReadOnly;
 
 pub mod kernel;

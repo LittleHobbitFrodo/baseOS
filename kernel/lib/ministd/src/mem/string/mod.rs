@@ -2,6 +2,9 @@
 //  this file originally belonged to baseOS project
 //      an OS template on which to build
 
+//! Provides `std::String`- like structure: the `ministd::String` will allow you to tweak its memory managemet!
+
+
 pub mod pattern;
 pub mod searcher;
 
@@ -27,14 +30,18 @@ const ALIGN: usize = 4;
 
 
 /// A ASCII–encoded, growable string.
-/// - this implementation will also allow you to tweak memory management using generic parameter
+/// - This implementation will also allow you to tweak memory management using generic parameter
 /// 
-/// **note**: implementation of the `Drop` trait is not needed for the memory is deallocated by `DynamicBuffer::drop()` automatically
-///  - data in this implementation of `String` are aligned to `align_of::<u32>()` for faster copying an searching
+/// **note**: Implementation of the `Drop` trait is not needed for the memory is deallocated by `DynamicBuffer::drop()` automatically
+///  - Data in this implementation of `String` are aligned to `align_of::<u32>()` for faster copying an searching
+///    - This is the minimal required align of the string
+/// 
+/// # Memory layout
+/// - The `ministd::String` has the same memory layout as `ministd::DynamicBuffer`
 /// 
 /// # Generic parameter
 /// `STEP` tells the structure how many characters has to be preallocated
-/// - has to be either `0` (for geometrical growth) or multiple of 4
+/// - Has to be either `0` (for geometrical growth) or multiple of 4
 #[repr(transparent)]
 pub struct String<const STEP: usize = 0> {
     data: DynamicBuffer<u8, STEP, ALIGN>,

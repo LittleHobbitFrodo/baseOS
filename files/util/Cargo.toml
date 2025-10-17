@@ -11,13 +11,16 @@ license="MIT"
 [profile.dev]
 panic="abort"
 
-
+[features]
+disable_ctor_checks=[]  #   disables the "the project is not configured" error
 
 [profile.release]
 opt-level = 3
 
 [dependencies]
 colored = "3.0.0"
+ctor = "0.5.0"
+paste = "1.0.15"
 serde = { version="1.0.228", features = ["derive"] }
 toml = "0.9.7"
 
@@ -30,3 +33,7 @@ path="src/main.rs"
 [[bin]]
 name="conf"
 path="src/conf.rs"
+
+[[bin]]
+name="forge"
+path="src/forge.rs"

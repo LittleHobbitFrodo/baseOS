@@ -5,15 +5,10 @@
 
 //  this file implements features of the buddy_system_allocator
 
-/// tells the allocator how to align data  
-/// 
-/// this is also the default align for all allocations  
-/// if you change the value:
-/// - must be > 0
-/// - must be power of 2
-/// 
-/// otherwise it could break things
-//pub const ALLOC_ALIGN: usize = 4;
+//! This is your kernel heap module
+//! - allocates/deallocates memory
+//! 
+//! **TODO**: make it modular!
 
 pub use buddy_system_allocator as allocator;
 use spin::MutexGuard;

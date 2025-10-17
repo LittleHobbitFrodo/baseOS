@@ -2,6 +2,9 @@
 //	this file originally belonged to baseOS project
 //		an OS template on which to build
 
+//! Provides the default text renderer for the `ministd` library through external crate (`lib/renderer`)
+
+
 use limine_rs as limine;
 use spin::{Mutex, MutexGuard};
 use super::Color;

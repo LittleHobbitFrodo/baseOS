@@ -90,12 +90,13 @@ function build_scripts() {
         rm ./commands/*
     fi
 
+    files="$(find "src/" -maxdepth 1 -type f -name "*.rs" ! -name 'main.rs')"
 
-    for i in "$(find "src/" -maxdepth 1 -type f -name "*.rs")"; do
+    IFS="
+"
+    for i in $files; do
 
         local name="$(basename "$i")"
-        #   skip main.rs
-        if [ "$name" = main.rs ]; then continue; fi
 
         local name="${name%.*}"
 
@@ -103,7 +104,12 @@ function build_scripts() {
             note "building the $(blue "$name") script"
         fi
 
-        output="$(cargo build --bin "$name" --color always 2>&1)"
+        if [ "$name" == "conf" ]; then
+            #   build the conf script with special feature
+            output="$(cargo build --bin conf --color always --features "disable_ctor_checks" 2>&1)"
+        else
+            output="$(cargo build --bin "$name" --color always 2>&1)"
+        fi
         if [ "$?" != 0 ]; then
             error "failed to build script \"$name\""
             echo -e "$output"

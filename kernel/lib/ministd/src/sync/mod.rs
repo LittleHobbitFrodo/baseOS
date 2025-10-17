@@ -2,6 +2,9 @@
 //  this file originally belonged to baseOS project
 //      an OS template on which to build
 
+//! Provides the `Arc` smart pointer (without the `Weak` pointer) and re-exports all usefult strucutres from the `spin` crate
+//! - such as `Once`, `Lazy`, `Mutex` and `RwLock`
+
 #[cfg(all(feature="rc", feature="allocator"))]
 mod arc;
 #[cfg(all(feature="rc", feature="allocator"))]

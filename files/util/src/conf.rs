@@ -1,5 +1,5 @@
 mod util;
-use std::{fs::File, process::ExitCode, str::FromStr};
+use std::{process::ExitCode, str::FromStr};
 
 use util::*;
 
@@ -19,6 +19,9 @@ static mut ALL_INSTALLED: bool = true;
 
 fn main() {
 
+    if std::fs::exists(PATH.config.util()).unwrap() {
+        fail!(user: "the project is already configured, try {} {} instead", "./util".green(), "reconf".blue());
+    }
 
     let archs = collect_args();
 
@@ -90,7 +93,6 @@ fn create_util_config(archs: &Vec<Arch>) -> Result<(), (&'static str, ConfigErro
 
 
     //  create arch specific configs
-
     for (arch, emul) in qemu {
         noteln!("creating config for {}", arch.as_str().blue());
         if let Err(e) = ArchConfig::from_parts(arch, cargo.clone(), emul.clone()).store() {
@@ -181,7 +183,7 @@ fn add_targets(archs: &Vec<Arch>) {
     for arch in archs.iter() {
         let triplet = format!("{}-unknown-none", arch.normalize());
         match cmd!(rustup.as_str(), "target", "add", triplet.as_str()) {
-            Ok(code) => if code != ExitCode::SUCCESS { fail!(internal: "failed to add target for {arch}"); },
+            Ok(code) => if !code.success() { fail!(internal: "failed to add target for {arch}"); },
             Err(e) => fail!(internal: "failed to add rustup target: {e:?}"),
         }
     }
@@ -191,10 +193,7 @@ fn add_targets(archs: &Vec<Arch>) {
 /// builds the limine commandline utility
 fn build_limine_cmd() {
 
-    let limine_cmd = match PATH.limine_path_string(LiminePath::CmdLine) {
-        Ok(cmd) => cmd,
-        Err(_) => fail!(internal: "failed to get path to limine command line utility"),
-    };
+    let limine_cmd = PATH.limine.cmdline_string();
 
     if std::fs::exists(&limine_cmd).expect("unexpected error") {
         if let Err(e) = std::fs::remove_file(&limine_cmd) {
@@ -204,7 +203,7 @@ fn build_limine_cmd() {
 
 
     match cmd!("gcc", "-o", limine_cmd.as_str(), "bootloader/limine.c") {
-        Ok(code) => if code != ExitCode::SUCCESS { fail!(internal: "failed to build limine cmdline utility"); },
+        Ok(code) => if !code.success() { fail!(internal: "failed to build limine cmdline utility"); },
         Err(e) => fail!(internal: "failed to build limine cmdline utility: {e:?}"),
     }
 
