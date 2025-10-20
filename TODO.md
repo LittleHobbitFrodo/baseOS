@@ -13,9 +13,8 @@ Yes, this is my todolist. Take a look if interested.
 
 ## Rust
 
-1. Add the `Cow` type
-2. Add the `Arc` type
-3. Add module for OS and kernel info
+1. Add support for the `FromIterator` trait
+2. Add module for OS and kernel info
     - add build GUID and time strings
-4. Add support for aarch64
+3. Add support for aarch64
 

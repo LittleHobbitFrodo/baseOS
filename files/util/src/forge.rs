@@ -1,11 +1,8 @@
 
+//! Forges (builds) the kernel for specified architectures
 
 mod util;
-use std::{fs::copy, io::Read, path::PathBuf, process::{ChildStdout, ExitCode, ExitStatus}, str::FromStr};
-
-
-use paste::paste;
-use serde::de;
+use std::{fs::copy, path::PathBuf};
 use util::*;
 
 
@@ -21,13 +18,13 @@ const CARGO_DEBUG_PARAMETERS: &'static [&'static str] = &["build", "--release", 
 
 fn main() {
 
-    let (archs, debug, verbose) = collect_args();
+    let (archs, _, debug, verbose) = collect_args();
 
     let project_root = current_dir();
 
     for arch in archs.iter() {
 
-        noteln!("forging kernel for {} target", arch.as_str());
+        noteln!("forging kernel for {} target", arch);
 
         //  load kernel configuration for this target
         let cfg = match ArchConfig::load(*arch) {
@@ -48,15 +45,19 @@ fn main() {
         //  go back
         std::env::set_current_dir(&project_root).expect("failed to go back to the project root");
         
+
+
         //  absolute path to the binary built by cargo
         let from = build_path(*arch, release);
         let to = PATH.forged.kernel(*arch).expect("failed to get path to the forged kernel");
 
+        //  copy the forged kernel into correct location
         if let Err(e) = copy(from, to) {
             fail!(internal: "failed to copy forged kernel: {e:?}");
         }
 
-        noteln!("the core for architecture {} was successfully forged", arch.as_str());
+
+        noteln!("the kernel for the {} target was successfully forged", arch.triplet());
 
     }
     
@@ -65,19 +66,18 @@ fn main() {
 
 /// Forges the kernel for target architecture
 /// - panics upon failure
-/// - prints the cargo output if the `verbose` is set to true
 fn forge_for(arch: Arch, cargo: &String, args: Vec<String>) {
 
-    match cmd_with_output(cargo.as_str(), Some(args)) {
+    match cmd::cmd_with_output(cargo.as_str(), Some(args)) {
         Ok((status, _)) => {
             //  fail if status is error, output is printed anyway bruh
 
             if !status.success() {
-                fail!(internal: "failed to forge the kernel for the {} target", arch.triplet().unwrap().blue());
+                fail!(internal: "failed to forge the kernel for the {} target", arch.triplet().blue());
             }
         },
         Err(e) => {
-            fail!(internal: "failed to forge the kernel for the {} target: {e}", arch.triplet().unwrap().blue());
+            fail!(internal: "failed to forge the kernel for the {} target: {e}", arch.triplet().blue());
         }
     }
 
@@ -99,7 +99,7 @@ fn build_path(arch: Arch, release: &'_ str) -> PathBuf {
     };
 
     let mut current = current_dir();
-    current.push(format!("kernel/bin/{}/{release}/{}", arch.triplet().unwrap(), kernel.name));
+    current.push(format!("kernel/bin/{}/{release}/{}", arch.triplet(), kernel.name));
     current
 
 }
@@ -111,53 +111,13 @@ fn cargo_parameters(arch: Arch, debug: bool, verbose: bool) -> (&'static str, Ve
     let mut args: Vec<String>;
     if debug == true {
         args = CARGO_DEBUG_PARAMETERS.iter().map(|p| p.to_string()).collect();
-        args.push(arch.triplet().unwrap());
+        args.push(arch.triplet().to_string());
         if verbose { args.push("--verbose".into()); }
         ("debug", args)
     } else {
         args = CARGO_RELEASE_PARAMETERS.iter().map(|p| p.to_string()).collect();
-        args.push(arch.triplet().unwrap());
+        args.push(arch.triplet().to_string());
         if verbose { args.push("--verbose".into()); }
         ("release", args)
     }
-}
-
-/// parses commandline arguments
-/// - returns `(<architectures>, debug, verbose)`
-/// - expects `-<switch>` for each argument that is not target architecture
-///   - for example: `./util forge x86_64 -debug`
-fn collect_args() -> (Vec<Arch>, bool, bool) {
-
-    let mut args: Vec<String> = std::env::args().collect();
-    args.remove(0);
-
-    let mut debug = false;
-
-    let mut verbose = false;
-
-    let (mut archs, other) = collect_arch(&args, true);
-
-    if archs.is_empty() {
-        archs = UTIL_CONFIG.read().expect("failed to acquire lock").arch.clone();
-    }
-
-    for o in other.iter() {
-        match o.as_str() {
-            "-debug" => {
-                debug = true;
-                noteln!("forging with debug option");
-            },
-            "-verbose" => {
-                verbose = true;
-                noteln!("turning on verbose output");
-            }
-
-            _ => {
-                fail!(user: "unknown switch {}", o.blue());
-            }
-        }
-    }
-
-    (archs, debug, verbose)
-
 }

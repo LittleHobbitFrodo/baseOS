@@ -106,7 +106,7 @@ function build_scripts() {
 
         if [ "$name" == "conf" ]; then
             #   build the conf script with special feature
-            output="$(cargo build --bin conf --color always --features "disable_ctor_checks" 2>&1)"
+            output="$(cargo build --bin conf --color always --features "disable_config_preloading" 2>&1)"
         else
             output="$(cargo build --bin "$name" --color always 2>&1)"
         fi

@@ -1,16 +1,37 @@
-#   you can specify your qemu parameters here
-#   this file will be injected into the script itself so you can use whatever parameters that can be found in util-<arch>.conf
 
-#   variables that you can use:
-#       current_arch = the script iterates through targets, this is the current one
-#       iso = each target build has its iso, this is it
-#   also look into files/base/scripts.conf
+#   # Qemu parameters
+#
+#  expects array of strings (`["X", "Y"]`)
+#
+#   ## Default parameters
+#   - stored in the `default` table
+#   - used when parameters for target are not found
+#
+#   ## Target specific parameters
+#   - stored in `<arch>` table (`x86_64`, `arm64`, ...)
 
-#   you need to specify the qemu_parameters and qemu_parameters_debug variables
+#   # Built-in variables
+#   - in-place substituted with its values
+#
+#   1. `{ISO}` = path to the ISO file for this target
+#   2. `{ARCH}` = current architecture
 
 
-qemu_parameters="-drive file=$iso,if=virtio,media=disk,discard=unmap"
-    #   parameters for regular emulation
+[default]
+normal=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
+debug=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
+    #   parameters in debug mode
 
-qemu_parameters_debug="-drive file=$iso,if=virtio,media=disk,discard=unmap"
-    #   parameters for emulation in debug mode
+[x86_64]
+normal=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
+debug=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
+
+[arm64]
+normal=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
+debug=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
+
+
+[vars]
+#   You can define your own variables here
+#       note that custom variables can only include built-in variables
+media="disk"

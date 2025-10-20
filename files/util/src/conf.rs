@@ -134,7 +134,7 @@ fn find_tools(archs: &Vec<Arch>) -> (String, String, Vec<(Arch, String)>) {
         warningln!("{} is not installed, please run {} {}", cmd_name.blue(), "./util".green(), "dep install all + reconf".blue());
     }
 
-    let xorriso = match search_path("xorriso") {
+    let xorriso = match cmd::search("xorriso") {
         Ok(x) => x,
         Err(_) => {
             not_installed_warning("xorriso");
@@ -143,7 +143,7 @@ fn find_tools(archs: &Vec<Arch>) -> (String, String, Vec<(Arch, String)>) {
         }
     };
 
-    let cargo = match search_path("cargo") {
+    let cargo = match cmd::search("cargo") {
         Ok(c) => c,
         Err(_) => {
             not_installed_warning("cargo");
@@ -155,7 +155,7 @@ fn find_tools(archs: &Vec<Arch>) -> (String, String, Vec<(Arch, String)>) {
     let mut emuls = Vec::new();
 
     for a in archs {
-        if let Ok(emul) = search_path(format!("qemu-system-{}", a.normalize()).as_str()) {
+        if let Ok(emul) = cmd::search(format!("qemu-system-{}", a.normalize()).as_str()) {
             emuls.push((*a, emul));
         } else {
             warningln!("{} for {} is not installed, please run {} {}", "qemu".blue(), *a, "./util".green(), "dep install all + reconf".blue());
@@ -173,7 +173,7 @@ fn find_tools(archs: &Vec<Arch>) -> (String, String, Vec<(Arch, String)>) {
 /// - panics upon failure
 fn add_targets(archs: &Vec<Arch>) {
 
-    let rustup = match search_path("rustup") {
+    let rustup = match cmd::search("rustup") {
         Ok(r) => r,
         Err(_) => {
             fail!(internal: "could not find {}, please install it", "rustup".blue());

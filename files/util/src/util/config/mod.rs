@@ -1,16 +1,34 @@
-use crate::util::{Arch, KERNEL_CONFIG, OS_CONFIG, UTIL_CONFIG};
-use std::{path::{self, Path, PathBuf}, str::FromStr};
 
-mod holders;
-pub use holders::*;
+//! Provides structures and functions allowing user to load/store configurations in a simple way
+
+use crate::util::{Arch, KERNEL_CONFIG, OS_CONFIG, UTIL_CONFIG};
+use std::{path::PathBuf, str::FromStr, fs::File, io::{Read, Write}};
+
+use super::current_dir;
+
+use serde::{Deserialize, Serialize};
+
+mod triplet;
+pub use triplet::*;
 
 use paste::paste;
 
+mod version;
+pub use version::*;
+mod utilcfg;
+pub use utilcfg::*;
+mod kernel;
+pub use kernel::*;
+mod os;
+pub use os::*;
+mod arch;
+pub use arch::*;
 
-/// Tells you where are things in the project
+
+/// Tells you where things are in the project
 pub static PATH: Paths = Paths::new();
 
-
+/// Path to the `qemu-parameters.toml` config file
 pub(super) const QEMU_PARAMETERS: &'static str = "config/qemu-parameters.toml";
 /// Path to config directory
 pub(super) const CONFIG_PATH: &'static str = "config/";
@@ -34,11 +52,42 @@ pub(super) const FORGE_KERNEL_PATH: &'static str = "files/forged/";
 /// Path to the iso image
 pub(super) const FORGE_ISO_PATH: &'static str = "files/forged/";
 
+pub trait ConfigHolder<'l>
+where Self: Sized + Serialize {
 
-/// Shortens and unify the process of getting the current working directory
-#[inline]
-fn current_dir() -> PathBuf {
-    std::env::current_dir().expect("failed to get current dir")
+    /// Marks the default path to the config file (from PWD)
+    /// - used in the `Self::load()` function
+    fn default_path() -> PathBuf;
+
+    fn default_path_for(&self) -> PathBuf;
+
+    /// creates empty config instance
+    fn empty() -> Self;
+
+    /// Loads the configuration from the `Self::DEFAULT_PATH`
+    fn load() -> Result<Self, ConfigError>
+    where Self: Deserialize<'l> {
+        let path = Self::default_path();
+        read_toml(path)
+    }
+
+    /// Loads the configuration from custom location
+    fn load_from(path: PathBuf) -> Result<Self, ConfigError>
+    where Self: Deserialize<'l> {
+        read_toml(path)
+    }
+
+
+    /// Stores the configuration to the `Self::DEFAULT_PATH`
+    fn store(&self) -> Result<(), ConfigError> {
+        write_toml(self, Self::default_path())
+    }
+
+    /// Stores the configuration to custom location
+    fn store_to(&self, path: PathBuf) -> Result<(), ConfigError> {
+        write_toml(self, path)
+    }
+
 }
 
 /// generates boilerplate code for path functions:
@@ -109,7 +158,7 @@ impl LiminePaths {
     /// Returns absolute path to the bootloader file for specific architecture
     /// - `BOOTX64.EFI` for x86_64, `BOOTAA64.EFI` for aarch64, etc.
     pub fn bootloader_for(&self, arch: Arch) -> Result<PathBuf, ()> {
-        let name = arch.bootloader_name()?;
+        let name = arch.bootloader_name();
         let mut path = self.data_dir();
         path.push(name); Ok(path)
     }
@@ -118,7 +167,7 @@ impl LiminePaths {
     /// Returns absolute path to the bootloader file fo specific architecture
     /// - `BOOTX64.EFI` for x86_64, `BOOTAA64.EFI` for aarch64, etc.
     pub fn bootloader_for_string(&self, arch: Arch) -> Result<String, ()> {
-        let name = arch.bootloader_name()?;
+        let name = arch.bootloader_name();
         Ok(format!("{}/{name}", self.data_dir_string()))
     }
 
@@ -138,22 +187,16 @@ impl ConfigPath {
     path_duo!(util, UTIL_CONFILG_FILE, "the util config file");
 
     /// Returns path to the arch configuration (`<arch>.toml`)
-    pub fn arch(&self, arch: Arch) -> Result<PathBuf, ()> {
-        let s = match arch {
-            Arch::None => return Err(()),
-            _ => format!("{}.toml", arch.normalize()),
-        };
+    pub fn arch(&self, arch: Arch) -> PathBuf {
+        let s = format!("{}.toml", arch.normalize());
         let mut path = current_dir();
         path.push(CONFIG_PATH);
-        path.push(s); Ok(path)
+        path.push(s); path
     }
 
     /// Returs path to the arch configurataion (`<arch>.toml`) as string
-    pub fn arch_str(&self, arch: Arch) -> Result<String, ()> {
-        match arch {
-            Arch::None => Err(()),
-            _ => Ok(format!("{}{CONFIG_PATH}/{}.toml", current_dir().to_string_lossy(), arch.normalize()))
-        }
+    pub fn arch_str(&self, arch: Arch) -> String {
+        format!("{}{CONFIG_PATH}/{}.toml", current_dir().to_string_lossy(), arch.normalize())
     }
 
 }
@@ -166,93 +209,51 @@ impl ForgedPath {
 
     /// Returns absolute path to the forged kernel for target architecture
     pub fn kernel(&self, arch: Arch) -> Result<PathBuf, ()> {
-        match arch {
-            Arch::None => return Err(()),
-            _ => {
-                let kernel = KERNEL_CONFIG.read().expect("failed to acquire lock");
-                Ok(PathBuf::from(format!("{}/{}/{}-{}.bin", current_dir().to_string_lossy(), FORGE_KERNEL_PATH, kernel.as_ref().ok_or(())?.name, arch.normalize())))
-            }
-        }
+        let kernel = KERNEL_CONFIG.read().map_err(|_| ())?;
+        Ok(PathBuf::from(format!("{}/{}/{}-{}.bin", current_dir().to_string_lossy(), FORGE_KERNEL_PATH, kernel.as_ref().ok_or(())?.name, arch.normalize())))
     }
 
     /// Returns relative path to the forged kernel for target architecture
     pub fn kernel_relative(&self, arch: Arch) -> Result<PathBuf, ()> {
-        match arch {
-            Arch::None => return Err(()),
-            _ => {
-                let kernel = KERNEL_CONFIG.read().expect("failed to acquire lock");
-                Ok(PathBuf::from(format!("{}/{}-{}.bin", FORGE_KERNEL_PATH, kernel.as_ref().ok_or(())?.name, arch.normalize())))
-            }
-        }
+        let kernel = KERNEL_CONFIG.read().map_err(|_| ())?;
+        Ok(PathBuf::from(format!("{}/{}-{}.bin", FORGE_KERNEL_PATH, kernel.as_ref().ok_or(())?.name, arch.normalize())))
     }
 
 
     /// Returns absolute path to the forged kernel for target architecture as string
     pub fn kernel_string(&self, arch: Arch) -> Result<String, ()> {
-        match arch {
-            Arch::None => return Err(()),
-            _ => {
-                let kernel = KERNEL_CONFIG.read().expect("failed to acquire lock");
-                Ok(format!("{}/{}/{}-{}.bin", current_dir().to_string_lossy(), FORGE_KERNEL_PATH, kernel.as_ref().ok_or(())?.name, arch.normalize()))
-            }
-        }
+        let kernel = KERNEL_CONFIG.read().map_err(|_| ())?;
+        Ok(format!("{}/{}/{}-{}.bin", current_dir().to_string_lossy(), FORGE_KERNEL_PATH, kernel.as_ref().ok_or(())?.name, arch.normalize()))
     }
 
     /// Returns relative path to the forged kernel for target architecture as string
     pub fn kernel_string_relative(&self, arch: Arch) -> Result<String, ()> {
-        match arch {
-            Arch::None => return Err(()),
-            _ => {
-                let kernel = KERNEL_CONFIG.read().expect("failed to acquire lock");
-                Ok(format!("{}/{}-{}.bin", FORGE_KERNEL_PATH, kernel.as_ref().ok_or(())?.name, arch.normalize()))
-            }
-        }
+        let kernel = KERNEL_CONFIG.read().map_err(|_| ())?;
+        Ok(format!("{}/{}-{}.bin", FORGE_KERNEL_PATH, kernel.as_ref().ok_or(())?.name, arch.normalize()))
     }
 
     /// Returns absolute path to the forged ISO image for target architecture
     pub fn iso(&self, arch: Arch) -> Result<PathBuf, ()> {
-        match arch {
-            Arch::None => Err(()),
-            _ => {
-                let os = UTIL_CONFIG.read().expect("failed to acquire lock");
-                
-                Ok(PathBuf::from(format!("{}/{}/{}-{}.iso", current_dir().to_string_lossy(), FORGE_ISO_PATH, os.iso_name, arch.normalize())))
-            },
-        }
+        let os = UTIL_CONFIG.read().map_err(|_| ())?;
+        Ok(PathBuf::from(format!("{}/{}/{}-{}.iso", current_dir().to_string_lossy(), FORGE_ISO_PATH, os.iso_name, arch.normalize())))
     }
 
     /// Returns relative path to the forged ISO image for target architecture
     pub fn iso_relative(&self, arch: Arch) -> Result<PathBuf, ()> {
-        match arch {
-            Arch::None => Err(()),
-            _ => {
-                let os = UTIL_CONFIG.read().expect("failed to acquire lock");
-                
-                Ok(PathBuf::from(format!("{}/{}-{}.iso", FORGE_ISO_PATH, os.iso_name, arch.normalize())))
-            },
-        }
+        let os = UTIL_CONFIG.read().map_err(|_| ())?;
+        Ok(PathBuf::from(format!("{}/{}-{}.iso", FORGE_ISO_PATH, os.iso_name, arch.normalize())))
     }
 
     /// Returns absolute path to the forged ISO image for target architecture as string
     pub fn iso_string(&self, arch: Arch) -> Result<String, ()> {
-        match arch {
-            Arch::None => Err(()),
-            _ => {
-                let os = UTIL_CONFIG.read().expect("failed to acquire lock");
-                Ok(format!("{}/{}/{}-{}.iso", current_dir().to_string_lossy(), FORGE_ISO_PATH, os.iso_name, arch.normalize()))
-            }
-        }
+        let os = UTIL_CONFIG.read().map_err(|_| ())?;
+        Ok(format!("{}/{}/{}-{}.iso", current_dir().to_string_lossy(), FORGE_ISO_PATH, os.iso_name, arch.normalize()))
     }
 
     /// Returns relative path to the forged ISO image for target architecture as string
     pub fn iso_string_relative(&self, arch: Arch) -> Result<String, ()> {
-        match arch {
-            Arch::None => Err(()),
-            _ => {
-                let os = UTIL_CONFIG.read().expect("failed to acquire lock");
-                Ok(format!("{}/{}-{}.iso", FORGE_ISO_PATH, os.iso_name, arch.normalize()))
-            }
-        }
+        let os = UTIL_CONFIG.read().map_err(|_| ())?;
+        Ok(format!("{}/{}-{}.iso", FORGE_ISO_PATH, os.iso_name, arch.normalize()))
     }
 
 
@@ -282,13 +283,13 @@ pub enum ConfigError {
     ParserError(String),
 
     /// Found one attribute multiple times (holds name of the attribute)
-    DuplicitAttribute(String),
+    DuplicitKey(String),
     /// Some attributes are missing
-    MissingAttributes(Vec<String>),
+    MissingKeys(Vec<String>),
     /// Invalid type for an attribute (holds `(name, expected type)`)
-    InvalidType((String, String)),
+    InvalidValueType((String, String)),
     /// Indicates invalid format for an attribute (holds `(name, message)`)
-    InvalidFormat((String, String)),
+    InvalidValueFormat((String, String)),
     /// Indicates error in architecture specification (`None` or unsupported)
     InvalidArch
 }
@@ -300,19 +301,66 @@ impl std::fmt::Display for ConfigError {
             Self::FailedToReadFile => write!(f, "failed to read file: unknown error"),
             Self::FailedToWriteFile => write!(f, "failed to write into file: unknown error"),
             Self::ParserError(e) => write!(f, "failed to parse config: {e}"),
-            Self::DuplicitAttribute(attr) => write!(f, "found duplicit attribute \"{attr}\""),
-            Self::MissingAttributes(attrs) => {
+            Self::DuplicitKey(key) => write!(f, "found duplicit key \"{key}\""),
+            Self::MissingKeys(keys) => {
                 let _ = write!(f, "found duplicit attributes: ");
-                for i in attrs {
+                for i in keys {
                     let _ = write!(f, "\"{i}\", ");
                 }
                 Ok(())
             },
-            Self::InvalidType((name, expected)) => write!(f, "attribute \"{name}\" has unsupported type, expected {expected}"),
-            Self::InvalidFormat((name, message)) => write!(f, "invalid format for attribute \"{name}\": {message}"),
+            Self::InvalidValueType((name, expected)) => write!(f, "attributkey \"{name}\" has unsupported type, expected {expected}"),
+            Self::InvalidValueFormat((name, message)) => write!(f, "invalid format for key \"{name}\": {message}"),
             Self::InvalidArch => write!(f, "unsupported architecture")
         }
     }
 }
 
 impl std::error::Error for ConfigError {}
+
+
+#[inline]
+/// Path to the arch configuration (`config/util-<arch>.toml`)
+fn arch_config_path(arch: Arch) -> PathBuf {
+    PathBuf::from(format!("config/{}.toml", arch.normalize()))
+}
+
+
+
+/// Reads the toml configuration and stores it in the structure
+pub fn read_toml<'l, T>(path: PathBuf) -> Result<T, ConfigError>
+where T: Sized + Deserialize<'l> {
+
+    let mut file = File::open(path).map_err(|e| ConfigError::FailedToOpenFile(e))?;
+
+    let mut loaded = String::with_capacity(64);
+
+    file.read_to_string(&mut loaded).map_err(|_| ConfigError::FailedToReadFile)?;
+
+
+    //  tell the borrow checker to stfu
+    let ptr = (loaded.len(), loaded.capacity(), loaded.leak().as_ptr() as *mut u8);
+
+    let r = unsafe {
+        str::from_utf8_unchecked(std::slice::from_raw_parts(ptr.2, ptr.0))
+    };
+
+    let ret = toml::from_str(r).map_err(|e| ConfigError::ParserError(e.message().to_string()));
+
+    drop(unsafe { String::from_raw_parts(ptr.2, ptr.0, ptr.1) });
+
+    ret
+}
+
+pub fn write_toml<T>(this: &T, path: PathBuf) -> Result<(), ConfigError>
+where T: Sized + Serialize {
+
+    let mut file = File::create(path).map_err(|e| ConfigError::FailedToOpenFile(e))?;
+
+    let serialized = toml::to_string_pretty(this).map_err(|e| ConfigError::ParserError(e.to_string()))?;
+
+    file.write(serialized.as_bytes()).map_err(|_| ConfigError::FailedToWriteFile)?;
+
+    Ok(())
+
+}
