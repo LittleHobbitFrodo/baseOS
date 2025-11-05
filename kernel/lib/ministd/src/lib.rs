@@ -19,6 +19,7 @@ pub use core::pin::Pin;
 pub mod mem;
 #[cfg(feature = "renderer")]
 pub mod renderer;
+#[macro_use]
 pub mod io;
 pub mod convert;
 pub mod init;

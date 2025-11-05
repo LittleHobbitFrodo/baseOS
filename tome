@@ -1,0 +1,78 @@
+#!/bin/bash
+
+source "$PWD/files/tome/header.sh"
+
+if [ "$#" -lt 1 ]; then
+    #   arg count <= 1
+    echo "$(red ERROR): no subcommand specified"
+    exec "$PWD/files/tome/help.sh"
+    exit 1
+fi
+
+#set -eEuo pipefail
+
+args="${@:1}"
+spell=$1
+
+function cast() {
+    if [ -e "$spell_path/commands/$spell" ] && [ -f "$spell_path/commands/$spell" ]; then
+        $spell_path/commands/$spell $cmd_args
+
+        case "$?" in
+            0)
+                return
+            ;;
+            2)
+                #   internal error
+                error "subcommand $(blue "$spell") failed due to internal error"
+                exit $internal_error
+            ;;
+            1)
+                #   user error
+                exec "$spell_path/help.sh" $spell
+            ;;
+        esac
+    else
+        error "unknown spell \"$spell\""
+        exec "$spell_path/help.sh"
+        exit $user_error
+    fi
+}
+
+IFS="+"
+for i in $args; do
+
+    #   delete spaces at the start and at the end
+    i="${i#"${i%%[![:space:]]*}"}"   # remove leading
+    i="${i%"${i##*[![:space:]]}"}"  # remove trailing
+
+    IFS=" "
+    spell="${i%% *}"   #   first word
+
+    if [ "$(echo "$i" | wc -w)" -gt 1 ]; then
+        #   has parameters
+        cmd_args="${i#* }"
+    else
+        #   no parameters
+        cmd_args=""
+    fi
+
+    case "$spell" in
+        invoke)
+            install_rustup notify
+            invoke_spells
+
+            #   run the invoke spell
+            cast
+        ;;
+        help|h|-h|--help|-help)
+            "$spell_path/help.sh" $cmd_args
+        ;;
+        *)
+            #   other subcommands
+            cast
+        ;;
+    esac
+
+    IFS="+"
+done

@@ -17,7 +17,7 @@ use core::ops::{Bound::*, Deref, DerefMut, Index, IndexMut, Range, RangeBounds};
 use core::cmp::Ordering::*;
 
 use crate::mem::DynamicBuffer;
-use crate::{ToOwned, TryClone, Cow};
+use crate::{println, Cow, ToOwned, TryClone};
 
 #[cfg(all(feature="allocator", feature="spin", feature="box"))]
 use crate::Box;
@@ -2053,11 +2053,14 @@ impl<T: Sized, const STEP: usize, const ALIGN: usize> Default for Vec<T, STEP, A
 }
 
 
-impl<T: Sized, const STEP: usize, const ALIGN: usize> Debug for Vec<T, STEP, ALIGN> {
+impl<T: Sized + Debug, const STEP: usize, const ALIGN: usize> Debug for Vec<T, STEP, ALIGN> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        _ = writeln!(f, "Vec: ptr: {:p}, size: {}, capacity: {}",
-            self.data.data().as_ptr(), self.data.size, self.capacity());
-        Ok(())
+
+        if f.alternate() {
+            write!(f, "Vec( ptr: {:p}, len: {}, capacity: {} )", self.as_ptr(), self.len(), self.capacity())
+        } else {
+            write!(f, "{:?}", if let Some(slc) = self.as_slice() { slc } else { &[] })
+        }
     }
 }
 
@@ -2292,6 +2295,64 @@ impl<'a, T: Clone> From<Vec<T>> for Cow<'a, [T]> {
     }
 }
 
+
+
+impl<'l, T: Sized + Clone, const STEP: usize, const ALIGN: usize> FromIterator<&'l T> for Vec<T, STEP, ALIGN> {
+    fn from_iter<I: IntoIterator<Item = &'l T>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+
+        let (lower, upper) = iter.size_hint();
+
+        let mut vec;
+
+        if let Some(upper) = upper {
+            //  the exact element count is `upper`
+            vec = Vec::with_capacity(upper);
+
+            for item in iter {
+                unsafe { vec.push_within_capacity_unchecked(item.clone()); }
+            }
+        } else {
+            //  the exact count of elements is not known (should be at least `lower`)
+            vec = Vec::with_capacity(lower);
+
+            for item in iter {
+                vec.push(item.clone());
+            }
+        }
+
+        vec
+    }
+}
+
+impl<T: Sized, const STEP: usize, const ALIGN: usize> FromIterator<T> for Vec<T, STEP, ALIGN> {
+    
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+
+        let (lower, upper) = iter.size_hint();
+
+        let mut vec;
+
+        if let Some(upper) = upper {
+            //  the exact element count is `upper`
+            vec = Vec::with_capacity(upper);
+
+            for item in iter {
+                unsafe { vec.push_within_capacity_unchecked(item); }
+            }
+        } else {
+            //  the exact count of elements is not known (should be at least `lower`)
+            vec = Vec::with_capacity(lower);
+
+            for item in iter {
+                vec.push(item);
+            }
+        }
+
+        vec
+    }
+}
 
 
 /// Creates a `Vec` containing the arguments

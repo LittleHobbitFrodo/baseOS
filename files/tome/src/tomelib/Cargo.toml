@@ -1,0 +1,19 @@
+[package]
+name = "tomelib"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+colored = "3.0.0"
+ctor = "0.5.0"
+paste = "1.0.15"
+serde = { version="1.0.228", features = ["derive"] }
+toml = "0.9.7"
+regex = "1.12.2"
+
+[features]
+disable_ctor_checks=[]
+    #   disables the "the project is not configured" error
+disable_config_preloading=[]
+    #   disables preloading config preloading
+    #   - the `UTIL_CONFIG`, `KERNEL_CONFIG` and `OS_CONFIG` variables will be `None`

@@ -11,7 +11,7 @@ The main goal of this project is to create a reliable and simple platform for cr
 BaseOS provides simplified standard library for Rust and tools that take care of dependencies, building and running the operating system.  
 This project is not intended to be an example of an operating system, only its foundation.
 
-# Licence
+# License
 The whole project is under the **M.I.T.** license, which allows you to add code/files to the project under different licenses (even proprietary).
 
 # Tools

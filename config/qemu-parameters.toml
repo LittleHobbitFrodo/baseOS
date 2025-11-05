@@ -18,17 +18,17 @@
 
 
 [default]
-normal=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
-debug=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
+normal=["-drive", "file={ISO},format=raw,if=virtio,media={media},discard=unmap"]
+debug=["-drive", "file={ISO},format=raw,if=virtio,media={media},discard=unmap"]
     #   parameters in debug mode
 
 [x86_64]
-normal=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
-debug=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
+normal=["-drive", "file={ISO},format=raw,if=virtio,media={media},discard=unmap"]
+debug=["-drive", "file={ISO},format=raw,if=virtio,media={media},discard=unmap"]
 
 [arm64]
-normal=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
-debug=["-drive", "file={ISO},if=virtio,media={media},discard=unmap"]
+normal=["-drive", "file={ISO},format=raw,if=virtio,media={media},discard=unmap"]
+debug=["-drive", "file={ISO},format=raw,if=virtio,media={media},discard=unmap"]
 
 
 [vars]

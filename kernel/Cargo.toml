@@ -30,6 +30,9 @@ panic="abort"
 testing=[]
     #   makes unit testing support possible
 
+debug_build=[]
+    #   checks whether the kernel is build with the `-debug` switch
+
 custom_testing=["testing"]
     #   makes unit testing with `ministd::run_tests!()` possible
 

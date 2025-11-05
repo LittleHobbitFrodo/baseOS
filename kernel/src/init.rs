@@ -8,6 +8,7 @@ use ministd::entry;
 use ministd::init;
 use ministd::{panic_fmt, println};
 use ministd::{testing, test_only};
+use ministd::{dbg, debug, Vec};
 
 
 
@@ -42,7 +43,6 @@ fn init() -> Result<(), ()> {
 
     //  run all tests
     ministd::run_tests!();
-
 
     Ok(())
 

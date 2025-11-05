@@ -11,10 +11,14 @@ Yes, this is my todolist. Take a look if interested.
     - assembler for each architecture
     - specified as parameter for conf subcommand?
 
-## Rust
+## Kernel
 
-1. Add support for the `FromIterator` trait
-2. Add module for OS and kernel info
+1. Add module for OS and kernel info
     - add build GUID and time strings
-3. Add support for aarch64
+2. Add support for aarch64
 
+### Misc
+
+1. Add equivalent of the `colored` crate for ministd
+2. Rename the project to `kickstarter`
+3. Readme

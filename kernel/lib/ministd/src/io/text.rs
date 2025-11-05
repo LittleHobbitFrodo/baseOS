@@ -145,11 +145,23 @@ macro_rules! eprintln {
     }};
 }
 
+
+/// Prints message if in debug mode
+#[macro_export]
+macro_rules! debug {
+    ($($arg:tt)*) => {{
+        use core::fmt::Write;
+        use $crate::renderer::MinistdRenderer;
+        #[cfg(feature = "debug_build")]
+            println!("DEBUG");
+    }};
+}
+
 #[macro_export]
 macro_rules! dbg {
 
     () => {
-        $crate::eprintln!("[{}:{}:{}]", core::file!(), core::line!(), core::column!());
+        $crate::println!("[{}:{}:{}]", core::file!(), core::line!(), core::column!());
     };
     ($guard:ident: $val:expr, $(,)?) => {{
         use $crate::renderer::MinistdRenderer;
@@ -158,7 +170,7 @@ macro_rules! dbg {
         $guard.set_color(0xff9a9a);
 
         let value = &$val;
-        $crate::eprint!($guard: "[{}:{}:{}] = {:#?}", core::file!(), core::line!(), core::column!(), core::stringify!($val),
+        $crate::println!($guard: "[{}:{}:{}] = {:?}", core::file!(), core::line!(), core::column!(), core::stringify!($val),
         &&value as &dyn core::fmt::Debug);
 
         $guard.set_color(color);
@@ -172,7 +184,41 @@ macro_rules! dbg {
 
         let value = &$val;
 
-        $crate::eprint!(rend: "[{}:{}:{}] {} = {:#?}", core::file!(), core::line!(), core::column!(), core::stringify!($val),
+        $crate::println!(rend: "[{}:{}:{}] {} = {:?}", core::file!(), core::line!(), core::column!(), core::stringify!($val),
+        &&value as &dyn core::fmt::Debug);
+        rend.set_color(color);
+    }};
+}
+
+/// Uses the `ministd::DebugRaw` trait to show implementation details about structure
+#[macro_export]
+macro_rules! dbg_raw {
+
+    () => {
+        $crate::println!("[{}:{}:{}]", core::file!(), core::line!(), core::column!());
+    };
+    ($guard:ident: $val:expr, $(,)?) => {{
+        use $crate::renderer::MinistdRenderer;
+
+        let color = $guard.color();
+        $guard.set_color(0xff9a9a);
+
+        let value = &$val;
+        $crate::println!($guard: "[{}:{}:{}] = {:#?}", core::file!(), core::line!(), core::column!(), core::stringify!($val),
+        &&value as &dyn core::fmt::Debug);
+
+        $guard.set_color(color);
+    }};
+    ($val:expr $(,)?) => {{
+        use $crate::renderer::MinistdRenderer;
+
+        let mut rend = $crate::RENDERER.lock();
+        let color = rend.color();
+        rend.set_color(0xff9a9a);
+
+        let value = &$val;
+
+        $crate::println!(rend: "[{}:{}:{}] {} = {:#?}", core::file!(), core::line!(), core::column!(), core::stringify!($val),
         &&value as &dyn core::fmt::Debug);
         rend.set_color(color);
     }};
